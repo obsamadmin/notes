@@ -1,0 +1,382 @@
+/*
+ * Copyright (C) 2003-2010 eXo Platform SAS.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation; either version 3
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see<http://www.gnu.org/licenses/>.
+ */
+package org.exoplatform.addons.notes.webui.popup;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ResourceBundle;
+
+import org.apache.commons.lang.StringUtils;
+
+import org.exoplatform.commons.utils.StringCommonUtils;
+import org.exoplatform.container.PortalContainer;
+import org.exoplatform.web.application.ApplicationMessage;
+import org.exoplatform.web.application.RequestContext;
+import org.exoplatform.web.application.RequireJS;
+import org.exoplatform.webui.commons.EventUIComponent;
+import org.exoplatform.webui.commons.EventUIComponent.EVENTTYPE;
+import org.exoplatform.webui.commons.UISpacesSwitcher;
+import org.exoplatform.webui.config.annotation.ComponentConfig;
+import org.exoplatform.webui.config.annotation.EventConfig;
+import org.exoplatform.webui.core.UIPopupComponent;
+import org.exoplatform.webui.core.UIPopupContainer;
+import org.exoplatform.webui.core.lifecycle.UIFormLifecycle;
+import org.exoplatform.webui.event.Event;
+import org.exoplatform.webui.event.EventListener;
+import org.exoplatform.webui.form.UIForm;
+import org.exoplatform.webui.form.UIFormInputInfo;
+import org.exoplatform.webui.form.UIFormStringInput;
+import org.exoplatform.webui.form.UIFormTextAreaInput;
+import org.exoplatform.addons.notes.commons.Utils;
+import org.exoplatform.addons.notes.commons.WikiConstants;
+import org.exoplatform.addons.notes.mow.api.Page;
+import org.exoplatform.addons.notes.mow.api.Wiki;
+import org.exoplatform.addons.notes.service.WikiPageParams;
+import org.exoplatform.addons.notes.service.WikiService;
+import org.exoplatform.addons.notes.tree.TreeNode;
+import org.exoplatform.addons.notes.tree.TreeNode.TREETYPE;
+import org.exoplatform.addons.notes.tree.utils.TreeUtils;
+import org.exoplatform.addons.notes.webui.UIWikiBreadCrumb;
+import org.exoplatform.addons.notes.webui.UIWikiLocationContainer;
+import org.exoplatform.addons.notes.webui.UIWikiPageEditForm;
+import org.exoplatform.addons.notes.webui.UIWikiPageTitleControlArea;
+import org.exoplatform.addons.notes.webui.UIWikiPortlet;
+import org.exoplatform.addons.notes.webui.UIWikiPortlet.PopupLevel;
+import org.exoplatform.addons.notes.webui.UIWikiRichTextArea;
+import org.exoplatform.addons.notes.webui.WikiMode;
+import org.exoplatform.addons.notes.webui.tree.UITreeExplorer;
+
+@ComponentConfig(
+  lifecycle = UIFormLifecycle.class, 
+  template = "app:/templates/wiki/webui/popup/UIWikiMovePageForm.gtmpl",
+  events = {
+    @EventConfig(listeners = UIWikiMovePageForm.CloseActionListener.class),
+    @EventConfig(listeners = UIWikiMovePageForm.MoveActionListener.class),
+    @EventConfig(listeners = UIWikiMovePageForm.SwitchSpaceActionListener.class, csrfCheck = false),
+    @EventConfig(listeners = UIWikiMovePageForm.RenameActionListener.class)
+  }
+)
+public class UIWikiMovePageForm extends UIForm implements UIPopupComponent {
+  
+  final static public String PAGENAME_INFO      = "pageNameInfo";
+
+  final static public String LOCATION_CONTAINER = "UIWikiLocationContainer";
+
+  final static public String UITREE             = "UIMoveTree";
+  
+  public String              MOVE               = "Move";
+  
+  private static final String MOVE_PAGE_CONTAINER = "UIWikiMovePageForm";
+  
+  private static final String SWITCH_SPACE_ACTION = "SwitchSpace";
+  
+  protected static final String SPACE_SWITCHER = "uiSpaceSwitcher_UIWikiMovePageForm";
+  
+  private static final String RENAME_ACTION = "Rename";
+  
+  private List<PageInfo> duplicatedPages;
+  
+  private PageInfo pageToMove;
+  
+  public UIWikiMovePageForm() throws Exception {
+    addChild(new UIFormInputInfo(PAGENAME_INFO, PAGENAME_INFO, null));
+    addChild(UIWikiLocationContainer.class, null, LOCATION_CONTAINER);
+    UITreeExplorer uiTree = addChild(UITreeExplorer.class, null, UITREE);
+
+    EventUIComponent eventComponent = new EventUIComponent(LOCATION_CONTAINER, UIWikiLocationContainer.CHANGE_NEWLOCATION, EVENTTYPE.EVENT);
+    StringBuilder initURLSb = new StringBuilder(Utils.getCurrentRestURL());
+    initURLSb.append("/wiki/tree/").append(TREETYPE.ALL.toString());
+    StringBuilder childrenURLSb = new StringBuilder(Utils.getCurrentRestURL());
+    childrenURLSb.append("/wiki/tree/").append(TREETYPE.CHILDREN.toString());
+    uiTree.init(initURLSb.toString(), childrenURLSb.toString(), getInitParam(URLEncoder.encode(Utils.getCurrentWikiPagePath(),"utf-8")), eventComponent, false);
+    
+    // Init space switcher
+    UISpacesSwitcher uiWikiSpaceSwitcher = addChild(UISpacesSwitcher.class, null, SPACE_SWITCHER);
+    uiWikiSpaceSwitcher.setCurrentSpaceName(Utils.upperFirstCharacter(Utils.getCurrentSpaceName()));
+    uiWikiSpaceSwitcher.setAutoResize(true);
+    uiWikiSpaceSwitcher.setAppId(WikiConstants.SPACES_SWITCHER_WIKI_APP_ID);
+    EventUIComponent eventComponent1 = new EventUIComponent(MOVE_PAGE_CONTAINER, SWITCH_SPACE_ACTION, EVENTTYPE.EVENT);
+    uiWikiSpaceSwitcher.init(eventComponent1);
+  }
+  
+  protected String createDuplicatedPageNotification() throws Exception {
+    if ((duplicatedPages == null) || duplicatedPages.isEmpty()) {
+      return StringUtils.EMPTY;
+    }
+    
+    ResourceBundle bundle = RequestContext.getCurrentInstance().getApplicationResourceBundle();
+    StringBuilder notifications = new StringBuilder();
+    
+    // Calculate the max display warning
+    int maxWarning = 5;
+    if (duplicatedPages.get(0).getName().equals(pageToMove.getName())) {
+      maxWarning = 6;
+    }
+    
+    // Get resource bundle
+    String dupplicatedParentMessage = bundle.getString("UIWikiMovePageForm.msg.main-page-duplicate");
+    String dupplicatedChildMessage = bundle.getString("UIWikiMovePageForm.msg.sub-page-duplicate");
+    String renameParentTooltip = bundle.getString("UIWikiMovePageForm.label.rename-main-page");
+    String renameChildTooltip = bundle.getString("UIWikiMovePageForm.label.rename-sub-page");
+    String renameActionLabel = bundle.getString("UIWikiMovePageForm.action.Rename");
+    
+    for (int i = 0; i < Math.min(duplicatedPages.size(), maxWarning); i++) {
+      PageInfo page = duplicatedPages.get(i);
+      // Build message markup
+      String message = dupplicatedChildMessage;
+      String tooltip = renameChildTooltip;
+      if (pageToMove.getName().equals(page.getName())) {
+        message = dupplicatedParentMessage;
+        tooltip = renameParentTooltip;
+      }
+      
+      // Convert message markup to html
+      String messageHTML = "<div class='alert'> <i class='uiIconWarning'></i>" + message + "</div>";
+      
+      // Add actions to message html
+      String renameActionLink = event(RENAME_ACTION, page.getName());
+      if (pageToMove.getName().equals(page.getName())) {
+        messageHTML = messageHTML.replace("{0}", "<a title='"+ tooltip + "' href=\"" + renameActionLink + "\">" + renameActionLabel + "</a>");
+      } else {
+        messageHTML = messageHTML.replace("{0}", page.getTitle());
+        messageHTML = messageHTML.replace("{1}", "<a title='"+ tooltip + "' href=\"" + renameActionLink + "\">" + renameActionLabel + "</a>");
+      }
+      
+      // Append the notification
+      notifications.append(messageHTML);
+    }
+    
+    // Check to add "and more" label
+    if (duplicatedPages.size() > maxWarning) {
+      String andMoreLabel = bundle.getString("UIWikiMovePageForm.msg.and-more");
+      andMoreLabel = "<div class='alert'> <i class='uiIconWarning'></i>" + andMoreLabel + "</div>";
+      notifications.append(andMoreLabel);
+    }
+    
+    return "<div class='box'>" + notifications.toString() + "</div>";
+  }
+  
+  public List<PageInfo> getDupplicatedPages() {
+    return duplicatedPages;
+  }
+
+  public void setDupplicatedPages(List<PageInfo> dupplicatedPages) {
+    this.duplicatedPages = dupplicatedPages;
+  }
+  
+  class PageInfo {
+    private String name;
+    
+    private String title;
+    
+    public PageInfo(Page page) {
+      this.name = page.getName();
+      this.title = page.getTitle();
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public void setName(String name) {
+      this.name = name;
+    }
+
+    public String getTitle() {
+      return title;
+    }
+
+    public void setTitle(String title) {
+      this.title = title;
+    }
+  }
+
+  static public class CloseActionListener extends EventListener<UIWikiMovePageForm> {
+    public void execute(Event<UIWikiMovePageForm> event) throws Exception {  
+      UIWikiPortlet wikiPortlet = event.getSource().getAncestorOfType(UIWikiPortlet.class);
+      UIPopupContainer popupContainer = wikiPortlet.getPopupContainer(PopupLevel.L1);
+      popupContainer.cancelPopupAction();
+      RequireJS requireJS = event.getRequestContext().getJavascriptManager().getRequireJS();
+      requireJS.require("SHARED/UITreeExplorer", "UITreeExplorer")
+              .addScripts("UITreeExplorer.setMovePage(false); ");
+    }
+  } 
+  
+  static public class MoveActionListener extends EventListener<UIWikiMovePageForm> {
+    public void execute(Event<UIWikiMovePageForm> event) throws Exception {   
+      WikiService wservice = (WikiService) PortalContainer.getComponent(WikiService.class);
+      UIWikiPortlet uiWikiPortlet = event.getSource().getAncestorOfType(UIWikiPortlet.class);
+      UIWikiMovePageForm movePageForm = event.getSource();
+      UIWikiLocationContainer locationContainer = movePageForm.findFirstComponentOfType(UIWikiLocationContainer.class);
+      UIWikiBreadCrumb currentLocation = (UIWikiBreadCrumb) locationContainer.getChildById(UIWikiLocationContainer.CURRENT_LOCATION);
+      UIWikiBreadCrumb newLocation = (UIWikiBreadCrumb) locationContainer.getChildById(UIWikiLocationContainer.NEW_LOCATION);
+      WikiPageParams currentLocationParams = currentLocation.getPageParam();
+      WikiPageParams newLocationParams = newLocation.getPageParam();
+      
+      if (newLocationParams == null) {
+        event.getRequestContext()
+             .getUIApplication()
+             .addMessage(new ApplicationMessage("UIWikiMovePageForm.msg.new-location-can-not-be-empty",
+                                                null,
+                                                ApplicationMessage.WARNING));
+        return;
+      }
+      
+      //If exist page same with move page name in new location
+      Page movepage = wservice.getPageOfWikiByName(currentLocationParams.getType(),
+              currentLocationParams.getOwner(),
+              currentLocationParams.getPageName());
+      
+      // If user move page across spaces
+      if (!currentLocationParams.getType().equals(newLocationParams.getType()) ||
+          !currentLocationParams.getOwner().equals(newLocationParams.getOwner())) {
+        
+        // Get the list of dupplicated page
+        List<Page> duplicatedPageList = wservice.getDuplicatePages(movepage, wservice.getWikiByTypeAndOwner(newLocationParams.getType(), newLocationParams.getOwner()), null);
+        movePageForm.duplicatedPages = new ArrayList<>();
+        for (Page page : duplicatedPageList) {
+          movePageForm.duplicatedPages.add(movePageForm.new PageInfo(page));
+        }
+        
+        // If there're some dupplicated page then show warning and return
+        if (movePageForm.duplicatedPages.size() > 0) {
+          movePageForm.pageToMove = movePageForm.new PageInfo(movepage);
+          return;
+        }
+      }
+      
+      // Move page
+      boolean isMoved = wservice.movePage(currentLocationParams, newLocationParams);      
+      if (!isMoved) {
+        event.getRequestContext()
+             .getUIApplication()
+             .addMessage(new ApplicationMessage("UIWikiMovePageForm.msg.no-permission-at-destination", null, ApplicationMessage.WARNING));
+        return;
+      }
+      
+      
+      // Update Page URL
+      movepage.setUrl(org.exoplatform.addons.notes.commons.Utils.getURLFromParams(newLocationParams));
+      
+      // Redirect to new location
+      UIPopupContainer popupContainer = uiWikiPortlet.getPopupContainer(PopupLevel.L1);    
+      popupContainer.cancelPopupAction();
+      newLocationParams.setPageName(currentLocationParams.getPageName());
+      String permalink = org.exoplatform.addons.notes.utils.Utils.getPermanlink(newLocationParams, false);
+      org.exoplatform.addons.notes.commons.Utils.redirect(permalink);
+      RequireJS requireJS = event.getRequestContext().getJavascriptManager().getRequireJS();
+      requireJS.require("SHARED/UITreeExplorer", "UITreeExplorer")
+              .addScripts("UITreeExplorer.setMovePage(false); ");
+    }
+  }
+
+  public void activate() {
+  }
+
+  public void deActivate() {
+  }
+  
+  private String getInitParam(String currentPath) throws Exception {
+    StringBuilder sb = new StringBuilder();
+    sb.append("?")
+      .append(TreeNode.PATH)
+      .append("=")
+      .append(currentPath)
+      .append("&")
+      .append(TreeNode.CURRENT_PATH)
+      .append("=")
+      .append(currentPath);
+    return sb.toString();
+  }
+  
+  public static class SwitchSpaceActionListener extends EventListener<UIWikiMovePageForm> {
+    public void execute(Event<UIWikiMovePageForm> event) throws Exception {
+      String wikiId = event.getRequestContext().getRequestParameter(UISpacesSwitcher.SPACE_ID_PARAMETER);
+      UIWikiMovePageForm uiWikiMovePageForm = event.getSource();
+      UISpacesSwitcher uiWikiSpaceSwitcher = uiWikiMovePageForm.getChildById(SPACE_SWITCHER);
+      WikiService wikiService = (WikiService) PortalContainer.getComponent(WikiService.class);
+      
+      Wiki wiki = wikiService.getWikiById(wikiId);
+      if (wiki == null) {
+        wiki = wikiService.createWiki(org.exoplatform.addons.notes.commons.Utils.getWikiTypeFromWikiId(wikiId), org.exoplatform.addons.notes.commons.Utils.getWikiOwnerFromWikiId(wikiId));
+      }
+      Page wikiHome = wiki.getWikiHome();
+      WikiPageParams params = new WikiPageParams(wiki.getType(), wiki.getOwner(), wikiHome.getName());
+      uiWikiSpaceSwitcher.setCurrentSpaceName(Utils.upperFirstCharacter(wikiService.getWikiNameById(wikiId)));
+      
+      // Change the init page of tree
+      UITreeExplorer uiTree = uiWikiMovePageForm.getChildById(UITREE);
+      StringBuilder initParams = new StringBuilder();
+      initParams.append("?")
+        .append(TreeNode.PATH)
+        .append("=")
+        .append(TreeUtils.getPathFromPageParams(params))
+        .append("&")
+        .append(TreeNode.CURRENT_PATH)
+        .append("=")
+        .append(Utils.getCurrentWikiPagePath());
+      uiTree.setInitParam(initParams.toString());
+      
+      // Change the breadcrum
+      UIWikiLocationContainer uiWikiLocationContainer = uiWikiMovePageForm.getChild(UIWikiLocationContainer.class);
+      UIWikiBreadCrumb newlocation = uiWikiLocationContainer.getChildById(UIWikiLocationContainer.NEW_LOCATION);
+      newlocation.setBreadCumbs(wikiService.getBreadcumb(params.getType(), params.getOwner(), params.getPageName()));
+      event.getRequestContext().addUIComponentToUpdateByAjax(uiWikiMovePageForm.getParent());
+    }
+  }
+  
+  public static class RenameActionListener extends EventListener<UIWikiMovePageForm> {
+    public void execute(Event<UIWikiMovePageForm> event) throws Exception {
+      String pageId = event.getRequestContext().getRequestParameter(OBJECTID);
+      UIWikiMovePageForm uiWikiMovePageForm = event.getSource();
+      UIWikiPortlet wikiPortlet = uiWikiMovePageForm.getAncestorOfType(UIWikiPortlet.class);
+      WikiService wikiService = (WikiService) PortalContainer.getComponent(WikiService.class);
+      Wiki currentWiki = Utils.getCurrentWiki();
+      Page pageToRename = wikiService.getPageOfWikiByName(currentWiki.getType(), currentWiki.getOwner(), pageId);
+      
+      // if page to rename does not exist then show the warning
+      if (pageToRename == null) {
+        event.getRequestContext().getUIApplication()
+          .addMessage(new ApplicationMessage("UIWikiMovePageForm.msg.page-not-exist=", null, ApplicationMessage.WARNING));
+        return;
+      }
+      
+      // Feed data to edit form and redirect
+      WikiPageParams targetParam = new WikiPageParams(currentWiki.getType(), currentWiki.getOwner(), pageToRename.getName());
+      UIWikiPageEditForm pageEditForm = wikiPortlet.findFirstComponentOfType(UIWikiPageEditForm.class);
+      UIFormStringInput titleInput = pageEditForm.getChild(UIWikiPageTitleControlArea.class).getUIStringInput();
+      UIFormTextAreaInput markupInput = pageEditForm.findComponentById(UIWikiPageEditForm.FIELD_CONTENT);
+      String title = pageToRename.getTitle();
+      String content = pageToRename.getContent();
+      titleInput.setEditable(true);
+      titleInput.setValue(StringCommonUtils.decodeSpecialCharToHTMLnumber(title));
+      pageEditForm.setTitle(title);
+      markupInput.setValue(content);
+      UIWikiRichTextArea wikiRichTextArea = pageEditForm.getChild(UIWikiRichTextArea.class);
+      if (wikiRichTextArea.isRendered()) {
+        Utils.feedDataForWYSIWYGEditor(pageEditForm, null);
+      }
+      
+      UIPopupContainer popupContainer = wikiPortlet.getPopupContainer(PopupLevel.L1);    
+      popupContainer.cancelPopupAction();
+      wikiPortlet.changeMode(WikiMode.EDITPAGE);            
+      Utils.ajaxRedirect(event, targetParam, WikiMode.EDITPAGE, null);
+    }
+  }
+}
+

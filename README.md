@@ -1,4 +1,4 @@
-wiki
+Notes
 ====
 
-eXo wiki
+Meeds wiki
