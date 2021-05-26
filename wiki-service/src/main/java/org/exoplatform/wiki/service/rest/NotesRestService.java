@@ -40,6 +40,7 @@ import org.exoplatform.social.rest.entity.IdentityEntity;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.mow.api.*;
 import org.exoplatform.wiki.resolver.TitleResolver;
+import org.exoplatform.wiki.service.PageUpdateType;
 import org.exoplatform.wiki.service.Relations;
 import org.exoplatform.wiki.service.WikiPageParams;
 import org.exoplatform.wiki.service.WikiService;
@@ -99,28 +100,8 @@ public class NotesRestService implements ResourceContainer {
     cc.setNoStore(true);
   }
 
-  /**
-   * Return the note page content as html or wiki syntax.
-   * 
-   * @param text contain the data as html
-   * @return the instance of javax.ws.rs.core.Response
-   * @LevelAPI Experimental
-   */
-  @POST
-  @Path("/content/")
-  public Response getNotePageContent(@FormParam("text") String text) {
-    try {
-      String outputText = WikiHTMLSanitizer.markupSanitize(text);
-
-      return Response.ok(outputText, MediaType.TEXT_HTML).cacheControl(cc).build();
-    } catch (Exception e) {
-      log.error("Error while converting wiki page content: " + e.getMessage(), e);
-      return Response.serverError().entity(e.getMessage()).cacheControl(cc).build();
-    }
-  }
-
   @GET
-  @Path("/{wikiType}/{wikiOwner:.+}/pages/{pageId}")
+  @Path("/pages/{wikiType}/{wikiOwner:.+}/{pageId}")
   @Produces(MediaType.APPLICATION_JSON)
   @RolesAllowed("users")
   public Response getPage(@Context UriInfo uriInfo,
@@ -132,6 +113,7 @@ public class NotesRestService implements ResourceContainer {
       if (page == null) {
         return Response.status(Response.Status.NOT_FOUND).build();
       }
+      page.setContent(WikiHTMLSanitizer.markupSanitize(page.getContent()));
       return Response.ok(page).build();
     } catch (Exception e) {
       log.error("Can't get page", e);
@@ -140,7 +122,7 @@ public class NotesRestService implements ResourceContainer {
   }
 
   /**
-   * Save draft title and content for a page specified by the given page params
+   * Create new Wiki page
    * 
    * @param page WIKI PAGE.
    * @return {@link Response} with status HTTPStatus.ACCEPTED if saving process is
@@ -150,12 +132,13 @@ public class NotesRestService implements ResourceContainer {
   @POST
   @Path("/page")
   @RolesAllowed("users")
-  public Response savePage(@ApiParam(value = "task object to be updated", required = true) Page page) {
+  public Response createPage(@ApiParam(value = "task object to be updated", required = true) Page page) {
     if (page == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     try {
       Identity identity = ConversationState.getCurrent().getIdentity();
+      /* TODO: check wiki permissions */
       Wiki wiki = wikiService.getWikiByTypeAndOwner(page.getWikiType(), page.getWikiOwner());
       if (wiki == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
@@ -178,4 +161,211 @@ public class NotesRestService implements ResourceContainer {
       return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
     }
   }
+
+  /**
+   * Update Wiki page
+   *
+   * @param page WIKI PAGE.
+   * @return {@link Response} with status HTTPStatus.ACCEPTED if saving process is
+   *         performed successfully with status HTTPStatus.INTERNAL_ERROR if there
+   *         is any unknown error in the saving process
+   */
+  @PUT
+  @Path("/pages/{wikiType}/{wikiOwner:.+}/{pageId}")
+  @RolesAllowed("users")
+  public Response updatePage(@ApiParam(value = "task object to be updated", required = true)
+                             @Context UriInfo uriInfo,
+                             @PathParam("wikiType") String wikiType,
+                             @PathParam("wikiOwner") String wikiOwner,
+                             @PathParam("pageId") String pageId,
+                             Page page) {
+    if (page == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      Page page_ = wikiService.getPageOfWikiByName(wikiType, wikiOwner, pageId);
+      if (page_ == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+
+      if(!wikiService.hasPermissionOnPage(page_,PermissionType.EDITPAGE,identity)){
+        return Response.status(Response.Status.FORBIDDEN).build();
+      }
+
+      if(!page_.getTitle().equals(page.getTitle())) {
+        String newPageName = TitleResolver.getId(page.getTitle(), false);
+        if (!org.exoplatform.wiki.utils.WikiConstants.WIKI_HOME_NAME.equals(page.getName())
+                && !page.getName().equals(newPageName)) {
+          wikiService.renamePage(wikiType, wikiOwner, page_.getName(), newPageName, page.getTitle());
+          page_.setName(newPageName);
+        }
+        page_.setTitle(page.getTitle());
+        wikiService.updatePage(page_, PageUpdateType.EDIT_PAGE_TITLE);
+        wikiService.createVersionOfPage(page_);
+        if (!"__anonim".equals(identity.getUserId())) {
+          WikiPageParams pageParams = new WikiPageParams(wikiType,wikiOwner,newPageName);
+          wikiService.removeDraftOfPage(pageParams);
+        }
+      }
+      else if(!page_.getContent().equals(page.getContent())) {
+        page_.setContent(page.getContent());
+        wikiService.updatePage(page_, PageUpdateType.EDIT_PAGE_CONTENT);
+        wikiService.createVersionOfPage(page_);
+      }
+      else if(!page_.getTitle().equals(page.getTitle())&&!page_.getContent().equals(page.getContent())) {
+        String newPageName = TitleResolver.getId(page.getTitle(), false);
+        page_.setTitle(page.getTitle());
+        page_.setContent(page.getContent());
+        if (!org.exoplatform.wiki.utils.WikiConstants.WIKI_HOME_NAME.equals(page.getName())
+                && !page.getName().equals(newPageName)) {
+          wikiService.renamePage(wikiType, wikiOwner, page_.getName(), newPageName, page.getTitle());
+          page_.setName(newPageName);
+        }
+        wikiService.updatePage(page_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE);
+        wikiService.createVersionOfPage(page_);
+        if (!"__anonim".equals(identity.getUserId())) {
+          WikiPageParams pageParams = new WikiPageParams(wikiType,wikiOwner,newPageName);
+          wikiService.removeDraftOfPage(pageParams);
+        }
+      }
+      return Response.ok().build();
+    } catch (Exception ex) {
+      log.warn(String.format("Failed to perform update wiki page %s:%s:%s",
+                             page.getWikiType(),
+                             page.getWikiOwner(),
+                             page.getId()),
+               ex);
+      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+    }
+  }
+
+
+  /**
+   * Display the current tree of a wiki based on is path
+   * @param type It can be a Portal, Group, User type of wiki
+   * @param path Contains the path of the wiki page
+   * @param currentPath Contains the path of the current wiki page
+   * @param showExcerpt Boolean to display or not the excerpt
+   * @param depth Defined the depth of the children we want to display
+   * @return List of descendants including the page itself.
+   */
+  @GET
+  @Path("/tree/{type}")
+  @RolesAllowed("users")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getTreeData(@PathParam("type") String type,
+                              @QueryParam(TreeNode.PATH) String path,
+                              @QueryParam(TreeNode.CURRENT_PATH) String currentPath,
+                              @QueryParam(TreeNode.CAN_EDIT) Boolean canEdit,
+                              @QueryParam(TreeNode.SHOW_EXCERPT) Boolean showExcerpt,
+                              @QueryParam(TreeNode.DEPTH) String depth) {
+    try {
+      List<JsonNodeData> responseData = new ArrayList<JsonNodeData>();
+      HashMap<String, Object> context = new HashMap<String, Object>();
+      context.put(TreeNode.CAN_EDIT, canEdit);
+      if (currentPath != null){
+        currentPath = URLDecoder.decode(currentPath, "utf-8");
+        context.put(TreeNode.CURRENT_PATH, currentPath);
+        WikiPageParams currentPageParam = TreeUtils.getPageParamsFromPath(currentPath);
+        org.exoplatform.wiki.mow.api.Page currentPage = wikiService.getPageOfWikiByName(currentPageParam.getType(), currentPageParam.getOwner(), currentPageParam.getPageName());
+        context.put(TreeNode.CURRENT_PAGE, currentPage);
+      }
+
+      EnvironmentContext env = EnvironmentContext.getCurrent();
+      HttpServletRequest request = (HttpServletRequest) env.get(HttpServletRequest.class);
+
+      // Put select page to context
+      path = URLDecoder.decode(path, "utf-8");
+      context.put(TreeNode.PATH, path);
+      WikiPageParams pageParam = TreeUtils.getPageParamsFromPath(path);
+      org.exoplatform.wiki.mow.api.Page page = wikiService.getPageOfWikiByName(pageParam.getType(), pageParam.getOwner(), pageParam.getPageName());
+      if (page == null) {
+        log.warn("User [{}] can not get wiki path [{}]. Wiki Home is used instead",
+                ConversationState.getCurrent().getIdentity().getUserId(), path);
+        page = wikiService.getPageOfWikiByName(pageParam.getType(), pageParam.getOwner(), pageParam.WIKI_HOME);
+        if(page == null) {
+          ResourceBundle resourceBundle = resourceBundleService.getResourceBundle("locale.portlet.wiki.WikiPortlet", request.getLocale());
+          String errorMessage = "";
+          if(resourceBundle != null) {
+            errorMessage = resourceBundle.getString("UIWikiMovePageForm.msg.no-permission-at-wiki-destination");
+          }
+          return Response.serverError().entity("{ \"message\": \"" + errorMessage + "\"}").cacheControl(cc).build();
+        }
+      }
+
+      context.put(TreeNode.SELECTED_PAGE, page);
+
+      context.put(TreeNode.SHOW_EXCERPT, showExcerpt);
+      if (type.equalsIgnoreCase(TREETYPE.ALL.toString())) {
+        Stack<WikiPageParams> stk = Utils.getStackParams(page);
+        context.put(TreeNode.STACK_PARAMS, stk);
+        responseData = getJsonTree(pageParam, context);
+      } else if (type.equalsIgnoreCase(TREETYPE.CHILDREN.toString())) {
+        // Get children only
+        if (depth == null)
+          depth = "1";
+        context.put(TreeNode.DEPTH, depth);
+        responseData = getJsonDescendants(pageParam, context);
+      }
+
+      encodeWikiTree(responseData, request.getLocale());
+      return Response.ok(new BeanToJsons(responseData), MediaType.APPLICATION_JSON).cacheControl(cc).build();
+    } catch (Exception e) {
+      log.error("Failed for get tree data by rest service - Cause : " + e.getMessage(), e);
+      return Response.serverError().entity(e.getMessage()).cacheControl(cc).build();
+    }
+  }
+
+
+  private List<JsonNodeData> getJsonTree(WikiPageParams params,HashMap<String, Object> context) throws Exception {
+    Wiki wiki = wikiService.getWikiByTypeAndOwner(params.getType(), params.getOwner());
+    WikiTreeNode wikiNode = new WikiTreeNode(wiki);
+    wikiNode.pushDescendants(context);
+    return TreeUtils.tranformToJson(wikiNode, context);
+  }
+
+  private List<JsonNodeData> getJsonDescendants(WikiPageParams params,
+                                                HashMap<String, Object> context) throws Exception {
+    TreeNode treeNode = TreeUtils.getDescendants(params, context);
+    return TreeUtils.tranformToJson(treeNode, context);
+  }
+
+
+  private void encodeWikiTree(List<JsonNodeData> responseData, Locale locale) throws Exception {
+    ResourceBundle resourceBundle = resourceBundleService.getResourceBundle(Utils.WIKI_RESOUCE_BUNDLE_NAME, locale);
+    String untitledLabel = "";
+    if (resourceBundle == null) {
+      // May happen in Tests
+      log.warn("Cannot find resource bundle '{}'", Utils.WIKI_RESOUCE_BUNDLE_NAME);
+    } else {
+      untitledLabel = resourceBundle.getString("Page.Untitled");
+    }
+
+    for (JsonNodeData data : responseData) {
+      if (StringUtils.isBlank(data.getName())) {
+        data.setName(untitledLabel);
+      }
+      if (CollectionUtils.isNotEmpty(data.children)) {
+        encodeWikiTree(data.children, locale);
+      }
+    }
+  }
+
+  private boolean hasEditPermission(List<PermissionEntry> permissions, String currentUser){
+    if (permissions != null) {
+      for (PermissionEntry permissionEntry : permissions) {
+        if(permissionEntry.getId().equals(currentUser)) {
+          for(Permission permission : permissionEntry.getPermissions()) {
+            if(permission.getPermissionType().equals(PermissionType.EDITPAGE) && permission.isAllowed()) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
 }
