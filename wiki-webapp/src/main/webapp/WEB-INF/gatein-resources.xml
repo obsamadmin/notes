@@ -18,9 +18,95 @@
     <application-name>wiki</application-name>
     <portlet-name>WikiPortlet</portlet-name>
     <skin-name>Enterprise</skin-name>
-    <css-path>/skin/css/wiki/wiki.css</css-path>
+    <css-path>/skin/css/notes/notes.css</css-path>
     <css-priority>1</css-priority>
   </portlet-skin>
+
+  <portlet-skin>
+    <application-name>wiki</application-name>
+    <portlet-name>Notes</portlet-name>
+    <skin-name>Enterprise</skin-name>
+    <css-path>/skin/css/notes/notes.css</css-path>
+  </portlet-skin>
+
+  <portlet-skin>
+    <application-name>wiki</application-name>
+    <portlet-name>NotesEditor</portlet-name>
+    <skin-name>Enterprise</skin-name>
+    <css-path>/skin/css/notes/notes.css</css-path>
+  </portlet-skin>
+
+  <portlet>
+    <name>Notes</name>
+    <module>
+      <script>
+        <minify>false</minify>
+        <path>/javascript/notes.bundle.js</path>
+      </script>
+      <depends>
+        <module>commonVueComponents</module>
+      </depends>
+      <depends>
+        <module>extensionRegistry</module>
+      </depends>
+      <depends>
+        <module>vue</module>
+      </depends>
+      <depends>
+        <module>vuetify</module>
+      </depends>
+      <depends>
+        <module>eXoVueI18n</module>
+      </depends>
+      <depends>
+        <module>commons-editor</module>
+        <as>editor</as>
+      </depends>
+      <depends>
+        <module>userPopupPlugin</module>
+      </depends>
+      <depends>
+        <module>jquery</module>
+        <as>$</as>
+      </depends>
+    </module>
+  </portlet>
+
+  <portlet>
+    <name>NotesEditor</name>
+    <module>
+      <script>
+        <minify>false</minify>
+        <path>/javascript/notesEditor.bundle.js</path>
+      </script>
+      <depends>
+        <module>commonVueComponents</module>
+      </depends>
+      <depends>
+        <module>extensionRegistry</module>
+      </depends>
+      <depends>
+        <module>vue</module>
+      </depends>
+      <depends>
+        <module>vuetify</module>
+      </depends>
+      <depends>
+        <module>commons-editor</module>
+        <as>editor</as>
+      </depends>
+      <depends>
+        <module>userPopupPlugin</module>
+      </depends>
+      <depends>
+        <module>eXoVueI18n</module>
+      </depends>
+      <depends>
+        <module>jquery</module>
+        <as>$</as>
+      </depends>
+    </module>
+  </portlet>
 
   <portlet>
     <name>WikiPortlet</name>
@@ -37,6 +123,9 @@
       <depends>
          <module>wikiPageContent</module>
       </depends>
+      <depends>
+         <module>NotesSwitch</module>
+      </depends>
     </module>
   </portlet>
 
@@ -44,7 +133,7 @@
     <name>wikiCkeditor</name>
     <script>
       <minify>false</minify>
-      <path>/javascript/eXo/wiki/ckeditor/wikiCkeditor.bundle.js</path>
+      <path>/javascript/wikiCkeditor.bundle.js</path>
     </script>
   </module>
 
@@ -52,7 +141,7 @@
     <name>wikiPageContent</name>
     <script>
       <minify>false</minify>
-      <path>/javascript/eXo/wiki/ckeditor/pageContent.bundle.js</path>
+      <path>/javascript/pageContent.bundle.js</path>
     </script>
     <depends>
       <module>vue</module>
@@ -701,7 +790,7 @@
     <name>wikiSearchCard</name>
     <script>
       <minify>false</minify>
-      <path>/javascript/eXo/wiki/ckeditor/wikiSearchCard.bundle.js</path>
+      <path>/javascript/wikiSearchCard.bundle.js</path>
     </script>
     <depends>
       <module>commonVueComponents</module>
@@ -714,6 +803,33 @@
     </depends>
     <depends>
       <module>vuetify</module>
+    </depends>
+    <depends>
+      <module>jquery</module>
+      <as>$</as>
+    </depends>
+    <depends>
+      <module>extensionRegistry</module>
+    </depends>
+  </module>
+
+  <module>
+    <name>NotesSwitch</name>
+    <script>
+      <minify>false</minify>
+      <path>/javascript/notesSwitch.bundle.js</path>
+    </script>
+    <depends>
+      <module>commonVueComponents</module>
+    </depends>
+    <depends>
+      <module>vue</module>
+    </depends>
+    <depends>
+      <module>vuetify</module>
+    </depends>
+    <depends>
+      <module>eXoVueI18n</module>
     </depends>
     <depends>
       <module>jquery</module>

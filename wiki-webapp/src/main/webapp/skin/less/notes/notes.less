@@ -1,19 +1,19 @@
 @import "../variables.less";
 @import "../mixins.less";
-@import "wiki-variables.less"; 
-@import "wiki-mixins.less";
-@import "UIWikiPermalinkForm/Style.less";
+@import "notes-variables.less";
+@import "notes-mixins.less";
+@import "UINotesPermalinkForm/Style.less";
 @import "Notifications/Style.less";
-@import "UIWikiPageVersionsCompare/Style.less";
-@import "UIWikiPageEditForm/Style.less";
+@import "UINotesPageVersionsCompare/Style.less";
+@import "UINotesPageEditForm/Style.less";
 @import "InlineEditing/Style.less";
 @import "PageInfo/Style.less";
 @import "PopupRelated/Style.less";
-@import "UIWikiAdvanceSearchResult/Style.less";
-@import "UIWikiMovePageForm/Style.less";
+@import "UINotesAdvanceSearchResult/Style.less";
+@import "UINotesMovePageForm/Style.less";
 @import "Sprites/Style.less";
 @import "UIViewContentDisplay/Style.less";
-@import "UIWikiPageContent/Style.less";
+@import "UINotesPageContent/Style.less";
 @import "/wiki/skin/DefaultSkin/webui/UIWikiRichTextEditor/Stylesheet.css";
 
 .UIWikiToolBar{
@@ -34,7 +34,115 @@
 	}
 }
 
+/************ New css feature notes ****************/
+#notesTop {
+	display: block;
+	box-shadow: 0 3px 5px hsla(0, 1%, 43%, 0.8);
+	z-index: 10;
+	.cke_top {
+		height: auto;
+	}
 
+	.cke_toolbox {
+		flex-flow: wrap;
+		border-bottom: 0;
+	}
+
+	.cke_shared {
+		border: 0;
+	}
+}
+
+#notesEditor{
+	background-color: @baseBackgroundDefault;
+	.formInputGroup{
+		display: flex;
+		margin: 0px 1%;
+		padding: 10px 0;
+		#cke_1_contents{
+			height: 400px;
+		}
+	}
+	#cke_notesContent {
+		border-color: transparent;
+		flex: 0 1 100%;
+		margin-bottom: 0;
+	}
+	.notesActions{
+		.notesFormButtons{
+			display: inline-flex;
+			flex-wrap: wrap;
+			justify-content: space-between;
+			width: 100%;
+			.notesFormLeftActions{
+				display: inline-flex;
+				flex-direction: row;
+				flex: auto;
+				justify-content: normal;
+				img {
+					height: 40px;
+				}
+				input[type="text"] {
+					flex: 0 1 100%;
+					margin-bottom: 0;
+					border-radius: 0px;
+					border-color: transparent;
+					padding: 0 20px;
+					font-size: 24px;
+				}
+			}
+			.notesFormRightActions{
+				display: inline-flex;
+				#notesUpdateAndPost{
+					height: 36px;
+					min-width: 64px;
+					padding: 0 16px;
+					color: @baseBackgroundDefault !important;
+					font-size: 15px;
+					letter-spacing: normal;
+					background-color: @primaryColor;
+				}
+				.notesCancel{
+					height: 36px;
+					min-width: 64px;
+					padding: 0 16px;
+				}
+			}
+		}
+	}
+}
+
+
+#notesOverviewApplication {
+  max-width: 100%;
+  .notes-application {
+    .notes-application-header {
+      .notes-treeview {
+        .uiTreeviewIcon {
+          font-family: "PLF-FONT-ICONS" !important;
+          font-style: normal;
+          font-size: 20px;
+          &:before {
+            content: "\e698";
+          }
+        }
+      }
+    }
+  }
+}
+
+
+@media (min-width: @minLargeDesktop) {
+  #notesOverviewApplication{
+    padding: 20px 14%;
+  }
+}
+
+@media (max-width: @maxDesktop) {
+  #notesOverviewApplication {
+    margin: 22px auto 10px;
+  }
+}
 
 /************ WikiBox ****************/
 
@@ -577,6 +685,8 @@
 }
 
 
+
+
 //responsive wiki
 @media (min-width: 769px) and (max-width: 1024px) {
     .uiWikiMiddleArea .uiLeftContainerArea {
@@ -641,3 +751,21 @@
         z-index: 2;
     }
 }
+
+// Temp for switch feature
+@media (min-width: @minLargeDesktop) {
+  .notesApplication {
+    padding: 5px 14%;
+  }
+}
+
+@media (max-width: @maxDesktop) {
+  .notesApplication {
+    margin: 7px auto 10px;
+  }
+}
+.wikiPortlet{
+	padding-left: 10px;
+    padding-right: 20px;
+}
+
