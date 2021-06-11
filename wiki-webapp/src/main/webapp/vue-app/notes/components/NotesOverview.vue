@@ -6,24 +6,46 @@
           <div class="notes-title d-flex justify-space-between">
             <span class=" title text-color">{{ notes.title }}</span>
             <div class="notes-header-icons">
-              <v-icon
-                size="22"
-                class="clickable"
-                :title="$t('notes.label.addPage')">
-                mdi-plus
-              </v-icon>
-              <v-icon
-                size="19"
-                class="clickable px-1"
-                :title="$t('notes.label.editPage')">
-                mdi-square-edit-outline
-              </v-icon>
-              <v-icon
-                size="19"
-                class="clickable"
-                :title="$t('notes.label.openMenu')">
-                mdi-dots-vertical
-              </v-icon>
+              <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-icon
+                    size="22"
+                    class="clickable"
+                    @click="addNotes"
+                    v-bind="attrs"
+                    v-on="on">
+                    mdi-plus
+                  </v-icon>
+                </template>
+                <span class="caption">{{ $t('notes.label.addPage') }}</span>
+              </v-tooltip>
+
+              <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-icon
+                    size="19"
+                    class="clickable"
+                    @click="editNotes"
+                    v-bind="attrs"
+                    v-on="on">
+                    mdi-square-edit-outline
+                  </v-icon>
+                </template>
+                <span class="caption">{{ $t('notes.label.editPage') }}</span>
+              </v-tooltip>
+
+              <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-icon
+                    size="19"
+                    class="clickable"
+                    v-bind="attrs"
+                    v-on="on">
+                    mdi-dots-vertical
+                  </v-icon>
+                </template>
+                <span class="caption">{{ $t('notes.label.openMenu') }}</span>
+              </v-tooltip>
             </div>
           </div>
           <!--<div class="notes-treeview d-flex pb-2">
@@ -63,9 +85,9 @@ export default {
         minute: '2-digit',
       },
       notesPageName: 'WikiHome',
-      wikiType: eXo.env.portal.spaceName ? 'group' : 'portal',
-      wikiOwner: eXo.env.portal.spaceName ? `/spaces/${eXo.env.portal.spaceName}` : `${eXo.env.portal.portalName}`,
-      wikiOwnerTree: eXo.env.portal.spaceName ? `spaces/${eXo.env.portal.spaceName}` : `${eXo.env.portal.portalName}`,
+      noteBookType: eXo.env.portal.spaceName ? 'group' : 'portal',
+      noteBookOwner: eXo.env.portal.spaceName ? `/spaces/${eXo.env.portal.spaceName}` : `${eXo.env.portal.portalName}`,
+      noteBookOwnerTree: eXo.env.portal.spaceName ? `spaces/${eXo.env.portal.spaceName}` : `${eXo.env.portal.portalName}`,
       noteTree: [],
       noteTreeElements: []
     };
@@ -89,22 +111,33 @@ export default {
     }
   },
   mounted() {
+    const urlPath = document.location.pathname;
+    if (urlPath.includes('/wiki/')){
+      const noteId = urlPath.split('/wiki/')[1];
+      this.notesPageName=noteId.split('/')[0];
+    }
     this.getNotes();
     this.getNoteTree();
   },
   methods: {
+    addNotes(){
+      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?parentNoteId=${this.notes.id}`,'_blank');
+    },
+    editNotes(){
+      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.notes.id}`,'_blank');
+    },
     retrieveUserInformations(userName) {
       this.$userService.getUser(userName).then(user => {
         this.lastUpdatedUser =  user.fullname;
       });
     },
     getNotes() {
-      return this.$notesService.getNotes(this.wikiType, this.wikiOwner , this.notesPageName).then(data => {
+      return this.$notesService.getNotes(this.noteBookType, this.noteBookOwner , this.notesPageName).then(data => {
         this.notes = data || [];
       });
     },
     getNoteTree() {
-      return this.$notesService.getNoteTree(this.wikiType, this.wikiOwnerTree , this.notesPageName).then(data => {
+      return this.$notesService.getNoteTree(this.noteBookType, this.noteBookOwnerTree , this.notesPageName).then(data => {
         this.noteTree = data && data.jsonList[0] || [];
       });
     },

@@ -16,6 +16,8 @@
  */
 package org.exoplatform.wiki.mow.api;
 
+import org.exoplatform.wiki.service.BreadcrumbData;
+
 import java.util.Date;
 import java.util.List;
 
@@ -55,7 +57,11 @@ public class Page {
 
   private String parentPageName;
 
+  private String parentPageId;
+
   private boolean isMinorEdit;
+
+  private List<BreadcrumbData> breadcrumb;
 
   public Page() {
   }
@@ -212,5 +218,21 @@ public class Page {
 
   public void setParentPageName(String parentPageName) {
     this.parentPageName = parentPageName;
+  }
+
+  public List<BreadcrumbData> getBreadcrumb() {
+    return breadcrumb;
+  }
+
+  public void setBreadcrumb(List<BreadcrumbData> breadcrumb) {
+    this.breadcrumb = breadcrumb;
+  }
+
+  public String getParentPageId() {
+    return parentPageId;
+  }
+
+  public void setParentPageId(String parentPageId) {
+    this.parentPageId = parentPageId;
   }
 }
