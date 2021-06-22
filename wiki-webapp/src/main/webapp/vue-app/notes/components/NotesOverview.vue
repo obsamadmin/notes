@@ -72,7 +72,7 @@
                     <a 
                       v-bind="attrs"
                       v-on="on"
-                      @click="getNoteById(note.id)"
+                      @click="getNoteById(note.id,'breadCrumb')"
                       class="caption text-truncate "
                       :class="index < notebreadcrumb.length-1 && 'path-clickable text-color' || 'text-sub-title not-clickable'">{{ note.title }}</a>
                   </template>
@@ -89,7 +89,7 @@
                       class="caption text-color text-truncate path-clickable"
                       v-bind="attrs"
                       v-on="on"
-                      @click="getNoteById(notebreadcrumb[0].id)">{{ notebreadcrumb[0].title }}</a>
+                      @click="getNoteById(notebreadcrumb[0].id,'breadCrumb')">{{ notebreadcrumb[0].title }}</a>
                   </template>
                   <span class="caption">{{ notebreadcrumb[0].title }}</span>
                 </v-tooltip>
@@ -121,7 +121,7 @@
                       class="caption text-color text-truncate path-clickable"
                       v-bind="attrs"
                       v-on="on"
-                      @click="getNoteById(notebreadcrumb[notebreadcrumb.length-2].id)">{{ notebreadcrumb[notebreadcrumb.length-2].title }}</a>
+                      @click="getNoteById(notebreadcrumb[notebreadcrumb.length-2].id,'breadCrumb')">{{ notebreadcrumb[notebreadcrumb.length-2].title }}</a>
                   </template>
                   <span class="caption">{{ notebreadcrumb[notebreadcrumb.length-2].title }}</span>
                 </v-tooltip>
@@ -134,7 +134,7 @@
                       class="caption text-color text-truncate text-sub-title"
                       v-bind="attrs"
                       v-on="on"
-                      @click="getNoteById(notebreadcrumb[notebreadcrumb.length-1].id)">{{ notebreadcrumb[notebreadcrumb.length-1].title }}</a>
+                      @click="getNoteById(notebreadcrumb[notebreadcrumb.length-1].id,'breadCrumb')">{{ notebreadcrumb[notebreadcrumb.length-1].title }}</a>
                   </template>
                   <span class="caption">{{ notebreadcrumb[notebreadcrumb.length-1].title }}</span>
                 </v-tooltip>
@@ -273,7 +273,7 @@ export default {
       window.location.pathname = notesConstants.PORTAL_BASE_URL;
     });
     this.$root.$on('open-note-by-id', noteId => {
-      this.getNoteById(noteId);
+      this.getNoteById(noteId,'tree');
     });
     this.$root.$on('confirmDeleteNote', () => {
       this.confirmDeleteNote();
@@ -304,8 +304,8 @@ export default {
         this.lastUpdatedUser =  user.fullname;
       });
     },
-    getNotes(noteBookType,noteBookOwner,notesPageName) {
-      return this.$notesService.getNotes(noteBookType, noteBookOwner , notesPageName).then(data => {
+    getNotes(noteBookType,noteBookOwner,notesPageName,source) {
+      return this.$notesService.getNotes(noteBookType, noteBookOwner , notesPageName,source).then(data => {
         this.notes = data || [];
         return this.$nextTick();
       }).catch(e => {
@@ -322,10 +322,9 @@ export default {
         this.$refs.notesBreadcrumb.open(this.makeNoteChildren(this.noteTree), this.noteBookType, this.noteBookOwnerTree, this.getOpenedTreeviewItems(this.notes.breadcrumb));
       });
     },
-    getNoteById(noteId) {
-      this.getNotes(this.noteBookType,this.noteBookOwner, noteId);
-      const value = notesConstants.PORTAL_BASE_URL.substring(notesConstants.PORTAL_BASE_URL.lastIndexOf('/') + 1);
-      notesConstants.PORTAL_BASE_URL = notesConstants.PORTAL_BASE_URL.replace(value, noteId);
+    getNoteById(noteId,source) {
+      this.getNotes(this.noteBookType,this.noteBookOwner, noteId,source);
+      notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.split(notesConstants.NOTES_PAGE_NAME)[0]}${notesConstants.NOTES_PAGE_NAME}/${noteId}`;
       window.history.pushState('wiki', '', notesConstants.PORTAL_BASE_URL);
     },
     makeNoteChildren(childrenArray) {
