@@ -25,11 +25,33 @@
             <div class="notesFormRightActions pr-7">
               <button
                 id="notesUpdateAndPost"
-                class="btn btn-primary primary pl-4 pr-4 py-0"
-                size="16"
+                class="btn btn-primary primary px-2 py-0"
                 @click="postNotes">
-                {{ $t("btn.post") }}
+                {{ $t("notes.button.publish") }}
+                <v-icon
+                  id="notesPublichAndPost"
+                  dark
+                  @click="openPublishAndPost">
+                  mdi-menu-down
+                </v-icon>
               </button>
+              <v-menu
+                v-model="publishAndPost"
+                :attach="'#notesUpdateAndPost'"
+                transition="scroll-y-transition"
+                content-class="publish-and-post-btn width-full"
+                offset-y
+                left>
+                <v-list-item
+                  class="px-2">
+                  <v-icon
+                    size="19"
+                    class="primary--text clickable pr-2">
+                    mdi-arrow-collapse-up
+                  </v-icon>
+                  <span class="body-2 text-color">{{ $t("notes.button.publishAndPost") }}</span>
+                </v-list-item>
+              </v-menu>
             </div>
           </div>
         </div>
@@ -70,12 +92,20 @@ export default {
       titleMaxLength: 1000,
       notesTitlePlaceholder: `${this.$t('notes.title.placeholderContentInput')}*`,
       notesBodyPlaceholder: `${this.$t('notes.body.placeholderContentInput')}*`,
+      publishAndPost: false
     };
   },
   mounted() {
     this.initCKEditor();
   },
   created() {
+    $(document).on('mousedown', () => {
+      if (this.publishAndPost) {
+        window.setTimeout(() => {
+          this.publishAndPost = false;
+        }, this.waitTimeUntilCloseMenu);
+      }
+    });
     this.$root.$on('show-alert', message => {
       this.displayMessage(message);
     });
@@ -129,6 +159,13 @@ export default {
           });
         }
       }
+    },
+    openPublishAndPost(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      this.publishAndPost = !this.publishAndPost;
     },
     initCKEditor: function() {
       if (CKEDITOR.instances['notesContent'] && CKEDITOR.instances['notesContent'].destroy) {
