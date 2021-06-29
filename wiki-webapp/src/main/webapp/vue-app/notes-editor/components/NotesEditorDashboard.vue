@@ -26,7 +26,7 @@
               <button
                 id="notesUpdateAndPost"
                 class="btn btn-primary primary px-2 py-0"
-                @click="postNotes">
+                @click="postNotes(false)">
                 {{ $t("notes.button.publish") }}
                 <v-icon
                   id="notesPublichAndPost"
@@ -43,6 +43,7 @@
                 offset-y
                 left>
                 <v-list-item
+                  @click.stop="postNotes(true)"
                   class="px-2">
                   <v-icon
                     size="19"
@@ -125,7 +126,7 @@ export default {
         this.notes = data || [];
       });
     },
-    postNotes(){
+    postNotes(toPost){
       if (this.validateForm()){
         const notes = {
           id: this.notes.id,
@@ -135,6 +136,7 @@ export default {
           wikiOwner: this.notes.wikiOwner,
           content: this.notes.content,
           parentPageId: this.notes.parentPageId,
+          toBePublished: toPost,
         };
         if (this.notes.id){
           this.$notesService.updateNote(notes).then(() => {
@@ -158,14 +160,14 @@ export default {
             });
           });
         }
-      }
+      } 
     },
     openPublishAndPost(event) {
+      this.publishAndPost = !this.publishAndPost;
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
-      this.publishAndPost = !this.publishAndPost;
     },
     initCKEditor: function() {
       if (CKEDITOR.instances['notesContent'] && CKEDITOR.instances['notesContent'].destroy) {
