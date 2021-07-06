@@ -95,8 +95,8 @@
       </div>
     </div>
     <notes-actions-menu
-      :note="notes" 
-      :default-path="defaultPath" 
+      :note="notes"
+      :default-path="defaultPath"
       @open-treeview="$refs.notesBreadcrumb.open(notes.id, 'movePage')" />
     <note-treeview-drawer ref="notesBreadcrumb" />
     <exo-confirm-dialog
@@ -212,7 +212,7 @@ export default {
     this.$root.$on('move-page', (note, newParentNote) => {
       this.moveNotes(note, newParentNote);
     });
-    
+
   },
   mounted() {
     this.getNotes(this.noteBookType, this.noteBookOwner , this.notesPageName);

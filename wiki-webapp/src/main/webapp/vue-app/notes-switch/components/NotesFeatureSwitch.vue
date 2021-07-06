@@ -77,7 +77,7 @@ export default {
   methods: {
     switchNotesApp() {
       document.dispatchEvent(new CustomEvent('displayTopBarLoading'));
-      
+
       if (this.useNewApp) {
         const theURL= new URL(window.location.href);
         theURL.searchParams.set('appView', 'old');
@@ -90,8 +90,8 @@ export default {
         window.history.pushState('wiki', '', theURL.href);
         document.dispatchEvent(new CustomEvent('hideTopBarLoading'));
         this.useNewApp = !this.useNewApp;
-      }  
-        
+      }
+
     },
     displayText() {
       window.setTimeout(() => this.imageLoaded = true, 200);
