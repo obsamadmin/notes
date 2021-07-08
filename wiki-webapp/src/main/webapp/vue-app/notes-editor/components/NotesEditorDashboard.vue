@@ -69,7 +69,7 @@
       </div>
     </div>
     <note-custom-plugins ref="noteCustomPlugins" :instance="instance" />
-    <note-breadcrumb-drawer ref="notesBreadcrumb" />
+    <note-treeview-drawer ref="notesBreadcrumb" />
   </v-app>
 </template>
 
@@ -221,7 +221,7 @@ export default {
         spaceURL: self.spaceURL,
         toolbarLocation: 'top',
         extraAllowedContent: 'img[style,class,src,referrerpolicy,alt,width,height]; span(*)[*]{*}; span[data-atwho-at-query,data-atwho-at-value,contenteditable]; a[*];i[*]',
-        removeButtons: 'Subscript,Superscript,Cut,Copy,Paste,PasteText,PasteFromWord,Undo,Redo,Scayt,Unlink,Anchor,Table,HorizontalRule,SpecialChar,Maximize,Source,Strike,Outdent,Indent,BGColor,About',
+        removeButtons: '',
         toolbar: [
           { name: 'format', items: ['Format'] },
           { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', '-', 'RemoveFormat'] },
