@@ -53,9 +53,9 @@ export default {
       { id: 'selectImage',title: 'Image', src: '/wiki/images/photo.png' },
       { id: 'video',title: 'Video', src: '/wiki/images/video.png' },
       { id: 'table',title: 'Table', src: '/wiki/images/table.png' },
-      /*{ id: 'note',title: 'Note', src: '/wiki/images/notes.png' },*/
-      { id: 'ToC',title: 'ToC', src: '/wiki/images/children.png' },
-      /*{ id: 'index',title: 'Index', src: '/wiki/images/index.png' },
+      { id: 'note',title: 'Note', src: '/wiki/images/notes.png' },
+      /*{ id: 'ToC',title: 'ToC', src: '/wiki/images/children.png' },
+      { id: 'index',title: 'Index', src: '/wiki/images/index.png' },
       { id: 'iframe',title: 'IFrame', src: '/wiki/images/iframe.png' },
       { id: 'code',title: 'Code', src: '/wiki/images/code.png' },*/
     ],
@@ -67,6 +67,11 @@ export default {
       default: () => null,
     },
   },
+  created() {
+    this.$root.$on('close-drawer', () => {
+      this.close();
+    });
+  },
   methods: {
     open() {
       this.$refs.customPluginsDrawer.open();
@@ -75,8 +80,9 @@ export default {
       this.$refs.customPluginsDrawer.close();
     },
     openPlugin(id){
-      this.close();
-      if ( id === 'ToC') {
+      if (id==='table'){
+        this.$root.$emit('note-table-plugins');
+      } else if ( id === 'note') {
         this.$root.$emit('display-treeview-items');
       } else {
         this.instance.execCommand(id);
