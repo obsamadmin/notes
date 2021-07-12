@@ -35,4 +35,14 @@ public class PageIndexingListener extends PageWikiListener {
     indexingService.unindex(WikiPageIndexingServiceConnector.TYPE, page.getId());
   }
 
+  @Override
+  public void postgetPagefromTree(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
+
+  }
+
+  @Override
+  public void postgetPagefromBreadCrumb(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
+
+  }
+
 }

@@ -472,7 +472,7 @@ public class WikiSpaceActivityPublisher extends PageWikiListener {
 
   @Override
   public void postAddPage(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
-    if (WikiConstants.WIKI_HOME_NAME.equals(pageId)) {
+    if (WikiConstants.WIKI_HOME_NAME.equals(pageId) || !page.isToBePublished()) {
       // catch the case of the Wiki Home added as it's created by the system, not by
       // users.
       return;
@@ -486,6 +486,18 @@ public class WikiSpaceActivityPublisher extends PageWikiListener {
       activityManager.deleteActivity(page.getActivityId());
     }
   }
+
+
+  @Override
+  public void postgetPagefromTree(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
+
+  }
+
+  @Override
+  public void postgetPagefromBreadCrumb(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
+
+  }
+
 
   @Override
   public void postUpdatePage(String wikiType,

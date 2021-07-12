@@ -1,14 +1,26 @@
 <template>
   <v-app class="white">
     <div :class="notesApplicationClass">
-      <div class="white my-3 py-2 primary--text">
+      <div v-show="useNewApp"  class="white my-3 py-2 primary--text">
         <v-btn
+          id="switchToOldWikiApp"
           link
           text
           class="primary--text font-weight-bold text-capitalize"
           @click="switchNotesApp">
           <v-icon class="me-3" size="16">far fa-window-restore</v-icon>
-          {{ buttonText }}
+          {{ $t('notes.switchToOldApp') }}
+        </v-btn>
+      </div>
+      <div v-show="!useNewApp" class="white my-3 py-2 primary--text">
+        <v-btn
+          id="switchToNewNotesApp"
+          link
+          text
+          class="primary--text font-weight-bold text-capitalize"
+          @click="switchNotesApp">
+          <v-icon class="me-3" size="16">far fa-window-restore</v-icon>
+          {{ $t('notes.switchToNewApp') }}
         </v-btn>
       </div>
       <div v-if="useNewApp" class="d-flex flex-column pb-4 notes-wrapper">
@@ -20,37 +32,66 @@
 <script>
 export default {
   data: () => ({
-    useNewApp: false,
+    useNewApp: true,
     imageLoaded: false,
-    notesApplicationClass: 'wikiPortlet',
+    notesApplicationClass: 'notesApplication',
     notesPageName: '',
+    noteBookType: eXo.env.portal.spaceName ? 'group' : 'portal',
+    noteBookOwner: eXo.env.portal.spaceGroup ? `/spaces/${eXo.env.portal.spaceGroup}` : `${eXo.env.portal.portalName}`,
+    currentPath: window.location.pathname, 
   }),
   computed: {
-    buttonText() {
-      if (this.useNewApp) {
-        return this.$t('notes.switchToOldApp');
+    notesPageName() {
+      if (this.currentPath.endsWith('/wiki')){
+        return 'WikiHome';
       } else {
-        return this.$t('notes.switchToNewApp');
+        if (!(this.currentPath.includes('/wiki/'))) {
+          return;
+        } else {
+          const noteId = this.currentPath.split('/').pop();
+          if (noteId) {
+            return noteId;
+          } else {
+            return 'WikiHome';
+          }
+        }
       }
     }
   },
-  watch: {
-    useNewApp() {
-      if (this.useNewApp) {
-        this.notesApplicationClass='notesApplication';
-        $('.uiWikiPortlet').hide();
-      } else {
+
+  created() {
+    const queryPath = window.location.search;
+    const urlParams = new URLSearchParams(queryPath);
+    if ( urlParams.has('appView') ){
+      const appView = urlParams.get('appView');
+      if (appView ==='old'){
+        this.useNewApp = false; 
         this.notesApplicationClass='WikiPortlet';
         $('.uiWikiPortlet').show();
+        const theURL= new URL(window.location.href);
+        theURL.searchParams.delete('appView');
+        window.history.pushState('wiki', '', theURL.href);
       }
-    },
+    }
   },
   methods: {
     switchNotesApp() {
-      this.useNewApp = !this.useNewApp;
-      if (!this.useNewApp) {
-        window.location.reload();
-      }
+      document.dispatchEvent(new CustomEvent('displayTopBarLoading'));
+      
+      if (this.useNewApp) {
+        const theURL= new URL(window.location.href);
+        theURL.searchParams.set('appView', 'old');
+        window.location.href=theURL.href;
+      } else {
+        this.notesApplicationClass='notesApplication';
+        $('.uiWikiPortlet').hide();
+        const theURL= new URL(window.location.href);
+        theURL.searchParams.delete('appView');
+        window.history.pushState('wiki', '', theURL.href);
+        document.dispatchEvent(new CustomEvent('hideTopBarLoading'));
+        this.useNewApp = !this.useNewApp;
+      }  
+        
     },
     displayText() {
       window.setTimeout(() => this.imageLoaded = true, 200);

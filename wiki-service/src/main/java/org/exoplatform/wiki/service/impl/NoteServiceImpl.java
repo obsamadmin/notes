@@ -117,6 +117,8 @@ public class NoteServiceImpl implements NoteService {
 
       Page createdPage = createNote(noteBook, parentPage, note);
 
+      createdPage.setToBePublished(note.isToBePublished());
+
       invalidateCache(parentPage);
       invalidateCache(note);
 
@@ -332,6 +334,23 @@ public class NoteServiceImpl implements NoteService {
   public Page getNoteOfNoteBookByName(String noteType,
                                       String noteOwner,
                                       String noteName,
+                                      Identity userIdentity,
+                                      String source) throws IllegalAccessException, WikiException {
+    Page page = getNoteOfNoteBookByName(noteType,noteOwner,noteName,userIdentity);
+    if(StringUtils.isNotEmpty(source)) {
+      if (source.equals("tree")) {
+        postOpenByTree(noteType, noteOwner, noteName, page);
+      }
+      if (source.equals("breadCrumb")) {
+        postOpenByBreadCrumb(noteType, noteOwner, noteName, page);
+      }
+    }
+    return page;
+  }
+  @Override
+  public Page getNoteOfNoteBookByName(String noteType,
+                                      String noteOwner,
+                                      String noteName,
                                       Identity userIdentity) throws IllegalAccessException, WikiException {
     Page page = null;
     page = getNoteOfNoteBookByName(noteType, noteOwner, noteName);
@@ -362,6 +381,29 @@ public class NoteServiceImpl implements NoteService {
     if (page != null) {
       if (!hasPermissionOnNote(page, PermissionType.VIEWPAGE, userIdentity)) {
         throw new IllegalAccessException("User does not have view the note.");
+      }
+    }
+    return page;
+  }
+
+  @Override
+  public Page getNoteById(String id, Identity userIdentity, String source) throws IllegalAccessException, WikiException {
+    if (id == null) {
+      return null;
+    }
+    Page page = null;
+    page = getNoteById(id);
+    if (page != null) {
+      if (!hasPermissionOnNote(page, PermissionType.VIEWPAGE, userIdentity)) {
+        throw new IllegalAccessException("User does not have view the note.");
+      }
+    }
+    if(StringUtils.isNotEmpty(source)) {
+      if (source.equals("tree")) {
+        postOpenByTree(page.getWikiType(), page.getWikiOwner(), page.getName(), page);
+      }
+      if (source.equals("breadCrumb")) {
+        postOpenByBreadCrumb(page.getWikiType(), page.getWikiOwner(), page.getName(), page);
       }
     }
     return page;
@@ -405,6 +447,8 @@ public class NoteServiceImpl implements NoteService {
     }
     return resultList;
   }
+
+
 
   @Override
   public void removeDraftOfNote(WikiPageParams param) throws WikiException {
@@ -676,6 +720,30 @@ public class NoteServiceImpl implements NoteService {
     for (PageWikiListener l : listeners) {
       try {
         l.postDeletePage(wikiType, wikiOwner, pageId, page);
+      } catch (WikiException e) {
+        if (log.isWarnEnabled()) {
+          log.warn(String.format("Executing listener [%s] on [%s] failed", l, page.getName()), e);
+        }
+      }
+    }
+  }
+  public void postOpenByTree(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
+    List<PageWikiListener> listeners = wikiService.getPageListeners();
+    for (PageWikiListener l : listeners) {
+      try {
+        l.postgetPagefromTree(wikiType, wikiOwner, pageId, page);
+      } catch (WikiException e) {
+        if (log.isWarnEnabled()) {
+          log.warn(String.format("Executing listener [%s] on [%s] failed", l, page.getName()), e);
+        }
+      }
+    }
+  }
+  public void postOpenByBreadCrumb(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
+    List<PageWikiListener> listeners = wikiService.getPageListeners();
+    for (PageWikiListener l : listeners) {
+      try {
+        l.postgetPagefromBreadCrumb(wikiType, wikiOwner, pageId, page);
       } catch (WikiException e) {
         if (log.isWarnEnabled()) {
           log.warn(String.format("Executing listener [%s] on [%s] failed", l, page.getName()), e);
