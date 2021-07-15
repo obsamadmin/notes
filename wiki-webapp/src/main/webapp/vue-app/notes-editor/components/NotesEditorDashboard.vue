@@ -186,7 +186,7 @@ export default {
         if (this.notes.id){
           this.$notesService.updateNoteById(notes).then(data => {
             if (data.url){
-              notePath = `${eXo.env.portal.context}${data.url}`;
+              notePath = data.url;
             } else {
               notePath = this.$notesService.getPathByNoteOwner(data).replace(/ /g, '_');
             }            
@@ -201,7 +201,7 @@ export default {
         } else {
           this.$notesService.createNote(notes).then(data => {
             if (data.url){
-              notePath = `${eXo.env.portal.context}${data.url}`;
+              notePath = data.url;
             } else {
               notePath = this.$notesService.getPathByNoteOwner(data).replace(/ /g, '_');
             }
@@ -294,11 +294,9 @@ export default {
           },
           doubleclick: function(evt) {
             const element = evt.data.element;
-            if ( element && element.is('a') && element.getAttribute( 'class' ) === 'noteLink') {
-              const noteName = element.getAttribute( 'href' );
-              self.$notesService.getNotes(self.notes.wikiType, self.notes.wikiOwner , noteName).then(data => {
-                self.$refs.notesBreadcrumb.open(data.id, 'includePages');
-              });
+            if ( element && element.is('a')) {
+                const noteId = element.getAttribute( 'href' );
+                self.$refs.noteTreeview.open(noteId, 'includePages', 'no-arrow');
             }
           }
         }
