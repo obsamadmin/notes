@@ -70,7 +70,7 @@
     </div>
     <note-custom-plugins ref="noteCustomPlugins" :instance="instance" />
     <note-table-plugins-drawer ref="noteTablePlugins" :instance="instance" />
-    <note-treeview-drawer ref="notesBreadcrumb" />
+    <note-treeview-drawer ref="noteTreeview" />
   </v-app>
 </template>
 
@@ -308,6 +308,13 @@ export default {
         this.$root.$emit('show-alert', {
           type: 'error',
           message: this.$t('notes.message.missingTitle')
+        });
+        return false;
+      }
+      if (!isNaN(this.notes.title)) {
+        this.$root.$emit('show-alert', {
+          type: 'error',
+          message: this.$t('notes.message.numericTitle')
         });
         return false;
       }
