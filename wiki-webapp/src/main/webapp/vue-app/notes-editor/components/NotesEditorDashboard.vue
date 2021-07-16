@@ -143,25 +143,25 @@ export default {
       }
     });
     this.$root.$on('include-page', (note) => {
-        const editor = $('textarea#notesContent').ckeditor().editor;
-        const editorSelectedElement = editor.getSelection().getStartElement();
-        if (editor.getSelection().getSelectedText()) {
-            if (editorSelectedElement.is('a')) {
-              if (editorSelectedElement.getAttribute( 'class' ) === 'noteLink') {
-                editor.getSelection().getStartElement().remove();
-                editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${note.name}</a>`);
-              }
-              if (editorSelectedElement.getAttribute( 'class' ) === 'labelLink') {
-                const linkText = editorSelectedElement.getHtml();
-                editor.getSelection().getStartElement().remove();
-                editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${linkText}</a>`);
-              }
-            } else {
-              editor.insertHtml(`<a href='${note.noteId}' class='labelLink' target='_blank'>${editor.getSelection().getSelectedText()}</a>`);
-            }
-          } else {
+      const editor = $('textarea#notesContent').ckeditor().editor;
+      const editorSelectedElement = editor.getSelection().getStartElement();
+      if (editor.getSelection().getSelectedText()) {
+        if (editorSelectedElement.is('a')) {
+          if (editorSelectedElement.getAttribute( 'class' ) === 'noteLink') {
+            editor.getSelection().getStartElement().remove();
             editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${note.name}</a>`);
           }
+          if (editorSelectedElement.getAttribute( 'class' ) === 'labelLink') {
+            const linkText = editorSelectedElement.getHtml();
+            editor.getSelection().getStartElement().remove();
+            editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${linkText}</a>`);
+          }
+        } else {
+          editor.insertHtml(`<a href='${note.noteId}' class='labelLink' target='_blank'>${editor.getSelection().getSelectedText()}</a>`);
+        }
+      } else {
+        editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${note.name}</a>`);
+      }
     });
   },
   methods: {
@@ -295,8 +295,8 @@ export default {
           doubleclick: function(evt) {
             const element = evt.data.element;
             if ( element && element.is('a')) {
-                const noteId = element.getAttribute( 'href' );
-                self.$refs.noteTreeview.open(noteId, 'includePages', 'no-arrow');
+              const noteId = element.getAttribute( 'href' );
+              self.$refs.noteTreeview.open(noteId, 'includePages', 'no-arrow');
             }
           }
         }
