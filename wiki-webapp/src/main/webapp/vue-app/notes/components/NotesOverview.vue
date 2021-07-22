@@ -4,8 +4,11 @@
       <div v-if="isAvailableNote" class="notes-application white border-radius pa-6">
         <div class="notes-application-header">
           <div class="notes-title d-flex justify-space-between">
-            <span class="title text-color mt-n1">{{ notes.title }}</span>
-            <div id="note-actions-menu" class="notes-header-icons text-right">
+            <span class="title text-color mt-n1">{{ noteTitle }}</span>
+            <div
+              id="note-actions-menu"
+              v-if="loadData"
+              class="notes-header-icons text-right">
               <v-tooltip bottom>
                 <template v-slot:activator="{ on, attrs }">
                   <v-icon
@@ -95,8 +98,8 @@
       </div>
     </div>
     <notes-actions-menu
-      :note="notes"
-      :default-path="defaultPath"
+      :note="notes" 
+      :default-path="defaultPath" 
       @open-treeview="$refs.notesBreadcrumb.open(notes.id, 'movePage')" />
     <note-treeview-drawer ref="notesBreadcrumb" />
     <exo-confirm-dialog
@@ -147,15 +150,18 @@ export default {
       alert: false,
       type: '',
       message: '',
+      loadData: false,
       openTreeView: false
     };
   },
   watch: {
     notes() {
       this.lastUpdatedUser = this.retrieveUserInformations(this.notes.author);
-      this.currentNoteBreadcrumb = this.notes.breadcrumb;
+      if ( this.notes && this.notes.breadcrumb && this.notes.breadcrumb.length ) {
+        this.notes.breadcrumb[0].title = this.$t('portal.global.noteHome');
+        this.currentNoteBreadcrumb = this.notes.breadcrumb;
+      }
       this.lastUpdatedTime = this.notes.updatedDate.time && this.$dateUtil.formatDateObjectToDisplay(new Date(this.notes.updatedDate.time), this.dateTimeFormat, this.lang) || '';
-      this.$root.$emit('update-breadcrumb', this.currentNoteBreadcrumb);
     }
   },
   computed: {
@@ -174,6 +180,13 @@ export default {
     },
     notebreadcrumb() {
       return this.currentNoteBreadcrumb;
+    },
+    noteTitle() {
+      if ( this.noteId === 1) {
+        return this.$t('portal.global.noteHome');
+      } else {
+        return this.notes.title;
+      }
     },
     notesPageName() {
       if (this.currentPath.endsWith('/wiki')){
@@ -201,6 +214,7 @@ export default {
   },
   created() {
     this.$root.$on('open-note-by-id', noteId => {
+      this.noteId = noteId;
       this.getNoteByName(noteId,'tree');
     });
     this.$root.$on('confirmDeleteNote', () => {
@@ -215,7 +229,7 @@ export default {
     this.$root.$on('move-page', (note, newParentNote) => {
       this.moveNotes(note, newParentNote);
     });
-
+    
   },
   mounted() {
     if (this.noteId){
