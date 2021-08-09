@@ -30,6 +30,7 @@ import org.apache.commons.lang.StringUtils;
 import org.exoplatform.commons.api.persistence.DataInitializer;
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.file.services.FileService;
+import org.exoplatform.commons.utils.ListAccess;
 import org.exoplatform.commons.utils.ObjectPageList;
 import org.exoplatform.commons.utils.PageList;
 import org.exoplatform.container.ExoContainerContext;
@@ -38,8 +39,14 @@ import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.container.xml.ValuesParam;
 import org.exoplatform.portal.config.*;
 import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
+import org.exoplatform.social.core.identity.provider.SpaceIdentityProvider;
+import org.exoplatform.social.core.manager.IdentityManager;
+import org.exoplatform.social.core.space.SpaceFilter;
+import org.exoplatform.social.core.space.model.Space;
+import org.exoplatform.social.core.space.spi.SpaceService;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.jpa.dao.*;
 import org.exoplatform.wiki.jpa.entity.*;
@@ -60,6 +67,8 @@ public class JPADataStorage implements DataStorage {
 
   public static final String WIKI_FILES_NAMESPACE_NAME = "wiki";
   public static final String WIKI_FILES_NAMESPACE_DESCRIPTION = "wiki application files";
+  public static final String WIKI_TYPE_GROUP = "group";
+  public static final String SPACE_FILTER_TYPE_MEMBER = "member";
 
   private WikiDAO        wikiDAO;
   private PageDAO        pageDAO;
@@ -100,26 +109,61 @@ public class JPADataStorage implements DataStorage {
   }
 
   @Override
-  public PageList<SearchResult> search(WikiSearchData wikiSearchData) {
+  public PageList<SearchResult> search(WikiSearchData wikiSearchData) throws Exception {
     if (wikiSearchData == null) {
       return new ObjectPageList<>(Collections.emptyList(), 0);
     }
     WikiElasticSearchServiceConnector searchService = PortalContainer.getInstance().getComponentInstanceOfType(WikiElasticSearchServiceConnector.class);
+    List<SearchResult> searchResults = new ArrayList<>();
+    if (wikiSearchData.getWikiOwner() == null){
+      if(wikiSearchData.getWikiType()==null){
+        wikiSearchData.setWikiType(WIKI_TYPE_GROUP);
+      }
+      String authenticatedUser = ConversationState.getCurrent().getIdentity().getUserId();
+      SpaceService spaceService =  PortalContainer.getInstance().getComponentInstanceOfType(SpaceService.class);
+      SpaceFilter spaceFilter = new SpaceFilter();
+      ListAccess<Space> listAccess = spaceService.getMemberSpacesByFilter(authenticatedUser, spaceFilter);
+      for (Space space:listAccess.load(0,wikiSearchData.getLimit())) {
+        //Trick to add the "/" at the beginning of the wiki owner
+        String wikiOwner = space.getGroupId();
+        if (WikiType.GROUP.isSame(wikiSearchData.getWikiType())) {
+          wikiOwner = pageDAO.validateGroupWikiOwner(wikiOwner);
+        }
 
-    //Trick to add the "/" at the beginning of the wiki owner
-    String wikiOwner = wikiSearchData.getWikiOwner();
-    if (WikiType.GROUP.isSame(wikiSearchData.getWikiType())) {
-      wikiOwner = pageDAO.validateGroupWikiOwner(wikiOwner);
+        List<SearchResult> searchResult = searchService.searchWiki(getSearchedText(wikiSearchData),
+            wikiSearchData.getWikiType(),
+            wikiOwner,
+            (int) wikiSearchData.getOffset(),
+            wikiSearchData.getLimit(),
+            wikiSearchData.getSort(),
+            wikiSearchData.getOrder());
+        for (SearchResult res :searchResult) {
+          String path = "/" + PortalContainer.getInstance().getName() + "/g/" + space.getGroupId().replaceAll("/",":") + "/" + space.getPrettyName() + "/notes/" ;
+          res.setUrl(path);
+          if(res.getWikiOwnerIdentity()==null){
+            IdentityManager identityManager =  PortalContainer.getInstance().getComponentInstanceOfType(IdentityManager.class);
+            res.setWikiOwnerIdentity(identityManager.getOrCreateIdentity(SpaceIdentityProvider.NAME, space.getPrettyName(), true));
+          }
+        }
+        searchResults.addAll(searchResult);
+      }
     }
+    else {
+      //Trick to add the "/" at the beginning of the wiki owner
+      String wikiOwner = wikiSearchData.getWikiOwner();
+      if (WikiType.GROUP.isSame(wikiSearchData.getWikiType())) {
+        wikiOwner = pageDAO.validateGroupWikiOwner(wikiOwner);
+      }
 
-    List<SearchResult> searchResults = searchService.searchWiki(getSearchedText(wikiSearchData),
-        wikiSearchData.getWikiType(),
-        wikiOwner,
-        (int) wikiSearchData.getOffset(),
-        wikiSearchData.getLimit(),
-        wikiSearchData.getSort(),
-        wikiSearchData.getOrder());
+       searchResults = searchService.searchWiki(getSearchedText(wikiSearchData),
+          wikiSearchData.getWikiType(),
+          wikiOwner,
+          (int) wikiSearchData.getOffset(),
+          wikiSearchData.getLimit(),
+          wikiSearchData.getSort(),
+          wikiSearchData.getOrder());
 
+    }
     return new ObjectPageList<>(searchResults, searchResults.size());
   }
 

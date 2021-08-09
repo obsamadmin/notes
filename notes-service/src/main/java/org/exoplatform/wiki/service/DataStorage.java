@@ -91,7 +91,7 @@ public interface DataStorage {
 
   public void createDraftPageForUser(DraftPage draftPage, String username) throws WikiException;
 
-  public PageList<SearchResult> search(WikiSearchData data) throws WikiException;
+  public PageList<SearchResult> search(WikiSearchData data) throws Exception;
 
   public List<TemplateSearchResult> searchTemplate(TemplateSearchData data) throws WikiException;
 

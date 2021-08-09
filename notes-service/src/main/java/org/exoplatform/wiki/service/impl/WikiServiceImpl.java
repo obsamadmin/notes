@@ -770,6 +770,23 @@ public class WikiServiceImpl implements WikiService, Startable {
           result = new ObjectPageList<>(tempSearchResult, result.getPageSize());
         }
       }
+      else {
+        for (SearchResult searchResult  : result.getAll().toArray(new SearchResult[0])){
+          data.setWikiOwner(searchResult.getWikiOwner());
+          Page homePage = getWikiByTypeAndOwner(data.getWikiType(), data.getWikiOwner()).getWikiHome();
+            Calendar wikiHomeCreateDate = Calendar.getInstance();
+            wikiHomeCreateDate.setTime(homePage.getCreatedDate());
+
+            Calendar wikiHomeUpdateDate = Calendar.getInstance();
+            wikiHomeUpdateDate.setTime(homePage.getUpdatedDate());
+
+            SearchResult wikiHomeResult = new SearchResult(data.getWikiType(), data.getWikiOwner(), homePage.getName(),
+                  null, null, homePage.getTitle(), SearchResultType.PAGE, wikiHomeUpdateDate, wikiHomeCreateDate);
+            List<SearchResult> tempSearchResult = result.getAll();
+            tempSearchResult.add(wikiHomeResult);
+            result = new ObjectPageList<>(tempSearchResult, result.getPageSize());
+      }
+      }
       return result;
     } catch (Exception e) {
       log.error("Cannot search on wiki " + data.getWikiType() + ":" + data.getWikiOwner() + " - Cause : " + e.getMessage(), e);
