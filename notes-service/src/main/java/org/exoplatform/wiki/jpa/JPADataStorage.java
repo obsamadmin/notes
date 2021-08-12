@@ -68,6 +68,8 @@ public class JPADataStorage implements DataStorage {
   public static final String WIKI_FILES_NAMESPACE_NAME = "wiki";
   public static final String WIKI_FILES_NAMESPACE_DESCRIPTION = "wiki application files";
   public static final String WIKI_TYPE_GROUP = "group";
+  public static final String WIKI_TYPE_USER = "user";
+  public static final String WIKI_TYPE_PORTAL = "portal";
   public static final String SPACE_FILTER_TYPE_MEMBER = "member";
 
   private WikiDAO        wikiDAO;
@@ -115,11 +117,9 @@ public class JPADataStorage implements DataStorage {
     }
     WikiElasticSearchServiceConnector searchService = PortalContainer.getInstance().getComponentInstanceOfType(WikiElasticSearchServiceConnector.class);
     List<SearchResult> searchResults = new ArrayList<>();
+    String authenticatedUser = ConversationState.getCurrent().getIdentity().getUserId();
     if (wikiSearchData.getWikiOwner() == null){
-      if(wikiSearchData.getWikiType()==null){
-        wikiSearchData.setWikiType(WIKI_TYPE_GROUP);
-      }
-      String authenticatedUser = ConversationState.getCurrent().getIdentity().getUserId();
+      wikiSearchData.setWikiType(WIKI_TYPE_GROUP);
       SpaceService spaceService =  PortalContainer.getInstance().getComponentInstanceOfType(SpaceService.class);
       SpaceFilter spaceFilter = new SpaceFilter();
       ListAccess<Space> listAccess = spaceService.getMemberSpacesByFilter(authenticatedUser, spaceFilter);
@@ -147,6 +147,24 @@ public class JPADataStorage implements DataStorage {
         }
         searchResults.addAll(searchResult);
       }
+      wikiSearchData.setWikiType(WIKI_TYPE_USER);
+      List<SearchResult> searchResult = searchService.searchWiki(getSearchedText(wikiSearchData),
+          wikiSearchData.getWikiType(),
+          authenticatedUser,
+          (int) wikiSearchData.getOffset(),
+          wikiSearchData.getLimit(),
+          wikiSearchData.getSort(),
+          wikiSearchData.getOrder());
+      searchResults.addAll(searchResult);
+      wikiSearchData.setWikiType(WIKI_TYPE_PORTAL);
+       searchResult = searchService.searchWiki(getSearchedText(wikiSearchData),
+          wikiSearchData.getWikiType(),
+          authenticatedUser,
+          (int) wikiSearchData.getOffset(),
+          wikiSearchData.getLimit(),
+          wikiSearchData.getSort(),
+          wikiSearchData.getOrder());
+      searchResults.addAll(searchResult);
     }
     else {
       //Trick to add the "/" at the beginning of the wiki owner
