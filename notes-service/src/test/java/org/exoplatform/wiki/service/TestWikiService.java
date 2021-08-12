@@ -333,17 +333,17 @@ public class TestWikiService extends BaseTest {
   }
 
   public void testSearchContent() throws Exception {
-    Wiki classicWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "classic");
+    Wiki classicWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "__system");
     Page kspage = new Page("knowledge suite 1", "knowledge suite 1");
     kspage.setContent("forum faq wiki");
     wService.createPage(classicWiki, "Home", kspage);
 
-    Wiki extWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "ext");
+    Wiki extWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "__system");
     Page ksExtPage = new Page("knowledge suite 2", "knowledge suite 2");
     ksExtPage.setContent("forum faq wiki");
     wService.createPage(extWiki, "Home", ksExtPage);
 
-    Wiki demoWiki = getOrCreateWiki(wService, PortalConfig.USER_TYPE, "demo");
+    Wiki demoWiki = getOrCreateWiki(wService, PortalConfig.USER_TYPE, "__system");
     Page ksSocialPage = new Page("knowledge suite", "knowledge suite");
     ksSocialPage.setContent("forum faq wiki");
     wService.createPage(demoWiki, "Home", ksSocialPage);
@@ -358,9 +358,20 @@ public class TestWikiService extends BaseTest {
     wService.createPage(guestWiki, "Home", guestPage);
 
     // fulltext search
-    WikiSearchData data = new WikiSearchData(null, "suite", "portal", "classic");
+    WikiSearchData data = new WikiSearchData(null, "suite", "portal", "__system");
     PageList<SearchResult> result = wService.search(data);
     assertEquals(0, result.getAll().size());
+
+    data = new WikiSearchData("suite", "suite", null, null);
+    result = wService.search(data);
+    assertEquals(2, result.getAll().size());
+
+    data = new WikiSearchData(null, "suite", null, null);
+    result = wService.search(data);
+    assertEquals(2, result.getAll().size());
+    data = new WikiSearchData("suite", null, null, null);
+    result = wService.search(data);
+    assertEquals(2, result.getAll().size());
 
     data = new WikiSearchData(null, "forum", "portal", "classic");
     result = wService.search(data);
