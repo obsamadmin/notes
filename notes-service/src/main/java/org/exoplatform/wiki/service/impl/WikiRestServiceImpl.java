@@ -587,11 +587,8 @@ public class WikiRestServiceImpl implements ResourceContainer {
           } else if (searchResult.getPoster() != null){
             IdentityEntity posterIdentity = EntityBuilder.buildEntityIdentity(searchResult.getPoster(), uriInfo.getPath(), "all");
             IdentityEntity wikiOwnerIdentity = searchResult.getWikiOwnerIdentity() != null ? EntityBuilder.buildEntityIdentity(searchResult.getWikiOwnerIdentity(), uriInfo.getPath(), "all") : null;
-            String url = searchResult.getUrl() != null ? searchResult.getUrl() : null;
-            if (searchResult.getType() != null && searchResult.getType().equals("group") ) {
-              url = url + page.getId();
-            }
-            titleSearchResults.add(new TitleSearchResult(searchResult.getTitle(), posterIdentity, wikiOwnerIdentity, searchResult.getExcerpt(), searchResult.getCreatedDate().getTimeInMillis(), searchResult.getType(),url));
+            searchResult.setUrl(searchResult.getUrl() + page.getId()) ;
+            titleSearchResults.add(new TitleSearchResult(searchResult.getTitle(), posterIdentity, wikiOwnerIdentity, searchResult.getExcerpt(), searchResult.getCreatedDate().getTimeInMillis(), searchResult.getType(),searchResult.getUrl()));
           }
         } else {
           log.warn("Cannot get page of search result " + searchResult.getWikiType() + ":" + searchResult.getWikiOwner() + ":" + searchResult.getPageName());

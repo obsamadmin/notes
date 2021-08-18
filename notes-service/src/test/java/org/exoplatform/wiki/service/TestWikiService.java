@@ -19,6 +19,7 @@ package org.exoplatform.wiki.service;
 
 import org.apache.commons.codec.binary.StringUtils;
 import org.apache.commons.io.IOUtils;
+import org.exoplatform.commons.utils.ObjectPageList;
 import org.exoplatform.commons.utils.PageList;
 import org.exoplatform.portal.config.DataStorage;
 import org.exoplatform.portal.config.UserPortalConfigService;
@@ -26,6 +27,7 @@ import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.jpa.BaseTest;
+import org.exoplatform.wiki.jpa.search.WikiElasticSearchServiceConnector;
 import org.exoplatform.wiki.mow.api.*;
 import org.exoplatform.wiki.service.search.SearchResult;
 import org.exoplatform.wiki.service.search.TemplateSearchData;
@@ -35,6 +37,11 @@ import org.exoplatform.wiki.service.search.WikiSearchData;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SuppressWarnings("deprecation")
 public class TestWikiService extends BaseTest {
@@ -333,47 +340,75 @@ public class TestWikiService extends BaseTest {
   }
 
   public void testSearchContent() throws Exception {
-    Wiki classicWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "__system");
+
+    Wiki userWiki1 = getOrCreateWiki(wService, PortalConfig.USER_TYPE, "root");
     Page kspage = new Page("knowledge suite 1", "knowledge suite 1");
     kspage.setContent("forum faq wiki");
-    wService.createPage(classicWiki, "Home", kspage);
+    wService.createPage(userWiki1, "Home", kspage);
 
-    Wiki extWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "__system");
+    Wiki userWiki2 = getOrCreateWiki(wService, PortalConfig.USER_TYPE, "root");
     Page ksExtPage = new Page("knowledge suite 2", "knowledge suite 2");
     ksExtPage.setContent("forum faq wiki");
-    wService.createPage(extWiki, "Home", ksExtPage);
+    wService.createPage(userWiki2, "Home", ksExtPage);
 
-    Wiki demoWiki = getOrCreateWiki(wService, PortalConfig.USER_TYPE, "__system");
-    Page ksSocialPage = new Page("knowledge suite", "knowledge suite");
-    ksSocialPage.setContent("forum faq wiki");
-    wService.createPage(demoWiki, "Home", ksSocialPage);
 
-    Page csPage = new Page("collaboration suite", "collaboration suite");
-    csPage.setContent("calendar mail contact chat");
-    wService.createPage(classicWiki, "Home", csPage);
+    WikiElasticSearchServiceConnector searchService = mock(WikiElasticSearchServiceConnector.class);
+    getContainer().unregisterComponent(WikiElasticSearchServiceConnector.class);
+    getContainer().registerComponentInstance("org.exoplatform.wiki.jpa.search.WikiElasticSearchServiceConnector", searchService);
 
-    Wiki guestWiki = getOrCreateWiki(wService, PortalConfig.GROUP_TYPE, "/platform/guests");
-    Page guestPage = new Page("Guest page", "Guest page");
-    guestPage.setContent("Playground");
-    wService.createPage(guestWiki, "Home", guestPage);
+    org.exoplatform.social.core.identity.model.Identity identityResult = new org.exoplatform.social.core.identity.model.Identity();
+    identityResult.setProviderId("organization");
+    identityResult.setRemoteId("root");
+    identityResult.setId("1");
+
+    List<SearchResult> emptyResultList = new ArrayList<org.exoplatform.wiki.service.search.SearchResult>();
+    org.exoplatform.wiki.service.search.SearchResult result1 = new SearchResult();
+    org.exoplatform.wiki.service.search.SearchResult result2 = new SearchResult();
+    result1.setWikiOwner("root");
+    result1.setWikiType("user");
+    result1.setWikiOwnerIdentity(identityResult);
+    result1.setExcerpt("home");
+    result1.setPoster(identityResult);
+    result1.setPageName("knowledge suite 1");
+
+    result2.setWikiOwner("root");
+    result2.setWikiType("user");
+    result2.setWikiOwnerIdentity(identityResult);
+    result2.setExcerpt("home");
+    result2.setPoster(identityResult);
+    result2.setPageName("knowledge suite 2");
+
+    List<SearchResult> results = new ArrayList<SearchResult>();
+    results.add(result1);
+    results.add(result2);
+    WikiSearchData data1 = new WikiSearchData(null, "not exist", "user", "root");
+    WikiSearchData data2 = new WikiSearchData("not exist", "not exist", "user", "root");
+    WikiSearchData data3 = new WikiSearchData("home", "home", null, null);
+    WikiSearchData data4 = new WikiSearchData(null, "home", null, null);
+
+    when(searchService.searchWiki(eq(data1.getContent()),eq(data1.getWikiType()),eq(data1.getWikiOwner()), eq((int) data1.getOffset()),eq(data1.getLimit()),eq(data1.getSort()),eq(data1.getOrder()))).thenReturn(emptyResultList);
+    when(searchService.searchWiki(eq(data2.getTitle()),eq(data2.getWikiType()),eq(data2.getWikiOwner()),eq((int) data2.getOffset()),eq(data2.getLimit()),eq(data2.getSort()),eq(data2.getOrder()))).thenReturn((emptyResultList));
+
+    when(searchService.searchWiki(eq(data3.getTitle()),eq("user"),any(), eq((int) data3.getOffset()),eq(data3.getLimit()),eq(data3.getSort()),eq(data3.getOrder()))).thenReturn(results);
+    when(searchService.searchWiki(eq(data4.getContent()),eq("user"),any(),eq ((int) data4.getOffset()),eq(data4.getLimit()),eq(data4.getSort()),eq(data4.getOrder()))).thenReturn(results);
 
     // fulltext search
-    WikiSearchData data = new WikiSearchData(null, "suite", "portal", "__system");
-    PageList<SearchResult> result = wService.search(data);
+
+    PageList<SearchResult> result = wService.search(data1);
     assertEquals(0, result.getAll().size());
 
-    data = new WikiSearchData("suite", "suite", null, null);
-    result = wService.search(data);
+    result = wService.search(data2);
+    assertEquals(0, result.getAll().size());
+
+    result = wService.search(data3);
     assertEquals(2, result.getAll().size());
 
-    data = new WikiSearchData(null, "suite", null, null);
-    result = wService.search(data);
-    assertEquals(2, result.getAll().size());
-    data = new WikiSearchData("suite", null, null, null);
-    result = wService.search(data);
+    result = wService.search(data4);
     assertEquals(2, result.getAll().size());
 
-    data = new WikiSearchData(null, "forum", "portal", "classic");
+    getContainer().unregisterComponent("org.exoplatform.wiki.jpa.search.WikiElasticSearchServiceConnector");
+
+    WikiSearchData data = new WikiSearchData(null, "forum", "portal", "classic");
     result = wService.search(data);
 // FIXME Failing Test coming from JPA Impl bug comparing to JCR Impl
 //    assertEquals(1, result.getAll().size());

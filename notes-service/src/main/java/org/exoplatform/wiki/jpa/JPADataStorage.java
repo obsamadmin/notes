@@ -117,13 +117,13 @@ public class JPADataStorage implements DataStorage {
     }
     WikiElasticSearchServiceConnector searchService = PortalContainer.getInstance().getComponentInstanceOfType(WikiElasticSearchServiceConnector.class);
     List<SearchResult> searchResults = new ArrayList<>();
-    String authenticatedUser = ConversationState.getCurrent().getIdentity().getUserId();
     if (wikiSearchData.getWikiOwner() == null){
+      String authenticatedUser = ConversationState.getCurrent().getIdentity().getUserId();
       wikiSearchData.setWikiType(WIKI_TYPE_GROUP);
       SpaceService spaceService =  PortalContainer.getInstance().getComponentInstanceOfType(SpaceService.class);
       SpaceFilter spaceFilter = new SpaceFilter();
       ListAccess<Space> listAccess = spaceService.getMemberSpacesByFilter(authenticatedUser, spaceFilter);
-      for (Space space:listAccess.load(0,wikiSearchData.getLimit())) {
+      for (Space space:listAccess.load(0,listAccess.getSize())) {
         //Trick to add the "/" at the beginning of the wiki owner
         String wikiOwner = space.getGroupId();
         if (WikiType.GROUP.isSame(wikiSearchData.getWikiType())) {
@@ -138,12 +138,10 @@ public class JPADataStorage implements DataStorage {
             wikiSearchData.getSort(),
             wikiSearchData.getOrder());
         for (SearchResult res :searchResult) {
-          String path = "/" + PortalContainer.getInstance().getName() + "/g/" + space.getGroupId().replaceAll("/",":") + "/" + space.getPrettyName() + "/notes/" ;
+          String path = "/" + PortalContainer.getInstance().getName() + "/g/:spaces:" + space.getGroupId().split("/")[2] + "/" + space.getPrettyName() + "/notes/" ;
           res.setUrl(path);
-          if(res.getWikiOwnerIdentity()==null){
-            IdentityManager identityManager =  PortalContainer.getInstance().getComponentInstanceOfType(IdentityManager.class);
-            res.setWikiOwnerIdentity(identityManager.getOrCreateIdentity(SpaceIdentityProvider.NAME, space.getPrettyName(), true));
-          }
+          IdentityManager identityManager =  PortalContainer.getInstance().getComponentInstanceOfType(IdentityManager.class);
+          res.setWikiOwnerIdentity(identityManager.getOrCreateIdentity(SpaceIdentityProvider.NAME, space.getPrettyName(), true));
         }
         searchResults.addAll(searchResult);
       }
@@ -165,6 +163,8 @@ public class JPADataStorage implements DataStorage {
           wikiSearchData.getSort(),
           wikiSearchData.getOrder());
       searchResults.addAll(searchResult);
+      wikiSearchData.setWikiOwner(null);
+      wikiSearchData.setWikiType(null);
     }
     else {
       //Trick to add the "/" at the beginning of the wiki owner
@@ -182,6 +182,7 @@ public class JPADataStorage implements DataStorage {
           wikiSearchData.getOrder());
 
     }
+
     return new ObjectPageList<>(searchResults, searchResults.size());
   }
 

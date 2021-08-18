@@ -23,6 +23,11 @@ import java.util.*;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.exoplatform.commons.utils.ObjectPageList;
+import org.exoplatform.commons.utils.PageList;
+import org.exoplatform.wiki.jpa.search.WikiElasticSearchServiceConnector;
+import org.exoplatform.wiki.service.search.SearchResult;
+import org.exoplatform.wiki.service.search.WikiSearchData;
 import org.junit.Test;
 
 import org.exoplatform.container.PortalContainer;
@@ -36,6 +41,11 @@ import org.exoplatform.wiki.service.WikiPageParams;
 import org.exoplatform.wiki.service.search.TemplateSearchData;
 import org.exoplatform.wiki.service.search.TemplateSearchResult;
 import org.exoplatform.wiki.utils.WikiConstants;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
@@ -74,6 +84,54 @@ public class JPADataStorageTest extends BaseWikiJPAIntegrationTest {
     assertNotNull(wikiHomePage.getCreatedDate());
     assertNotNull(wikiHomePage.getUpdatedDate());
     assertTrue(StringUtils.isNotEmpty(wikiHomePage.getContent()));
+  }
+  @Test
+  public void testSearch() throws Exception {
+    Wiki wiki = new Wiki();
+    wiki.setType("user");
+    wiki.setOwner("wiki1");
+
+    // When
+    storage.createWiki(wiki);
+    Wiki createdWiki = storage.getWikiByTypeAndOwner("user", "wiki1");
+    Page wikiHomePage = createdWiki.getWikiHome();
+
+
+    WikiElasticSearchServiceConnector searchService = mock(WikiElasticSearchServiceConnector.class);
+    getContainer().unregisterComponent(WikiElasticSearchServiceConnector.class);
+    getContainer().registerComponentInstance("org.exoplatform.wiki.jpa.search.WikiElasticSearchServiceConnector", searchService);
+
+    org.exoplatform.social.core.identity.model.Identity identityResult = new org.exoplatform.social.core.identity.model.Identity();
+    identityResult.setProviderId("organization");
+    identityResult.setRemoteId("root");
+    identityResult.setId("1");
+
+    List<SearchResult> emptyResultList = new ArrayList<org.exoplatform.wiki.service.search.SearchResult>();
+    org.exoplatform.wiki.service.search.SearchResult result1 = new SearchResult();
+    org.exoplatform.wiki.service.search.SearchResult result2 = new SearchResult();
+    result1.setWikiOwner("wiki1");
+    result1.setWikiType("user");
+    result1.setWikiOwnerIdentity(identityResult);
+    result1.setExcerpt("home");
+    result1.setPoster(identityResult);
+    result1.setPageName("Home");
+
+
+    List<SearchResult> results = new ArrayList<SearchResult>();
+    results.add(result1);
+    WikiSearchData data1 = new WikiSearchData(null, "not exist", "user", "root");
+    WikiSearchData data2 = new WikiSearchData("home", "home", null, null);
+
+    when(searchService.searchWiki(eq(data1.getContent()),eq(data1.getWikiType()),eq(data1.getWikiOwner()), eq((int) data1.getOffset()),eq(data1.getLimit()),eq(data1.getSort()),eq(data1.getOrder()))).thenReturn(emptyResultList);
+    when(searchService.searchWiki(eq(data2.getTitle()),eq("user"),any(), eq((int) data2.getOffset()),eq(data2.getLimit()),eq(data2.getSort()),eq(data2.getOrder()))).thenReturn(results);
+
+    PageList<SearchResult> result = storage.search(data1);
+    assertEquals(0, result.getAll().size());
+
+    result = storage.search(data2);
+    assertEquals(1, result.getAll().size());
+
+    getContainer().unregisterComponent("org.exoplatform.wiki.jpa.search.WikiElasticSearchServiceConnector");
   }
 
   @Test

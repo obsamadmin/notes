@@ -771,8 +771,10 @@ public class WikiServiceImpl implements WikiService, Startable {
         }
       }
       else {
+        List<SearchResult> tempSearchResult = new ArrayList<>();
         for (SearchResult searchResult  : result.getAll().toArray(new SearchResult[0])){
           data.setWikiOwner(searchResult.getWikiOwner());
+          data.setWikiType(searchResult.getWikiType());
           Page homePage = getWikiByTypeAndOwner(data.getWikiType(), data.getWikiOwner()).getWikiHome();
             Calendar wikiHomeCreateDate = Calendar.getInstance();
             wikiHomeCreateDate.setTime(homePage.getCreatedDate());
@@ -780,12 +782,14 @@ public class WikiServiceImpl implements WikiService, Startable {
             Calendar wikiHomeUpdateDate = Calendar.getInstance();
             wikiHomeUpdateDate.setTime(homePage.getUpdatedDate());
 
-            SearchResult wikiHomeResult = new SearchResult(data.getWikiType(), data.getWikiOwner(), homePage.getName(),
-                  null, null, homePage.getTitle(), SearchResultType.PAGE, wikiHomeUpdateDate, wikiHomeCreateDate);
-            List<SearchResult> tempSearchResult = result.getAll();
-            tempSearchResult.add(wikiHomeResult);
-            result = new ObjectPageList<>(tempSearchResult, result.getPageSize());
-      }
+            searchResult.setCreatedDate(wikiHomeCreateDate);
+            searchResult.setUpdatedDate(wikiHomeUpdateDate);
+            searchResult.setPageName(homePage.getName());
+            tempSearchResult.add(searchResult);
+        }
+        result = new ObjectPageList<>(tempSearchResult, result.getPageSize());
+        data.setWikiOwner(null);
+        data.setWikiType(null);
       }
       return result;
     } catch (Exception e) {
