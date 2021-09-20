@@ -6,21 +6,15 @@
       dismissible>
       {{ message }}
     </v-alert>
-    <div>
-      <div
-        id="notesEditor"
-        class="notesEditor width-full">
+    <div
+      id="notesEditor"
+      class="notesEditor width-full">
+      <div class="notes-topbar">
         <div class="notesActions white">
           <div class="notesFormButtons d-inline-flex flex-wrap width-full pa-3 ma-0">
-            <div class="notesFormLeftActions d-inline-flex mr-10">
+            <div class="notesFormLeftActions d-inline-flex align-center me-10">
               <img :src="srcImageNote">
-              <input
-                ref="autoFocusInput1"
-                id="notesTitle"
-                class="mb-0 pr-5"
-                v-model="notes.title"
-                :placeholder="notesTitlePlaceholder"
-                type="text">
+              <span class="notesFormTitle ps-2">{{ notesFormTitle }}</span>
             </div>
             <div class="notesFormRightActions pr-7">
               <button
@@ -57,16 +51,29 @@
           </div>
         </div>
         <div id="notesTop" class="width-full"></div>
-        <div class="formInputGroup white overflow-auto ma-2 pa-2 flex">
-          <textarea
-            id="notesContent"
-            v-model="notes.content"
-            :placeholder="notesBodyPlaceholder"
-            class="notesFormInput"
-            name="notesContent">
-              </textarea>
-        </div>
       </div>
+
+      <form class="notes-content">
+        <div class="notes-content-form px-4">
+          <div class="formInputGroup notesTitle mx-3">
+            <input
+              id="notesTitle"
+              v-model="notes.title"
+              :placeholder="notesTitlePlaceholder"
+              type="text"
+              class="py-0 px-1 mt-5 mb-0">
+          </div>
+          <div class="formInputGroup white overflow-auto flex notes-content-wrapper">
+            <textarea
+              id="notesContent"
+              v-model="notes.content"
+              :placeholder="notesBodyPlaceholder"
+              class="notesFormInput"
+              name="notesContent">
+                     </textarea>
+          </div>
+        </div>
+      </form>
     </div>
     <note-custom-plugins ref="noteCustomPlugins" :instance="instance" />
     <note-table-plugins-drawer
@@ -106,11 +113,16 @@ export default {
       titleMaxLength: 1000,
       notesTitlePlaceholder: `${this.$t('notes.title.placeholderContentInput')}*`,
       notesBodyPlaceholder: `${this.$t('notes.body.placeholderContentInput')}*`,
-      publishAndPost: false
+      publishAndPost: false,
+      spaceId: '',
+      notesFormTitle: '',
     };
   },
   mounted() {
     this.initCKEditor();
+    const elementNewTop = document.getElementById('notesTop');
+    elementNewTop.classList.add('darkComposerEffect');
+    this.setToolBarEffect();
   },
   created() {
     $(document).on('mousedown', () => {
@@ -142,6 +154,7 @@ export default {
       this.getNotes(this.noteId);
     } else if (urlParams.has('parentNoteId')){
       this.parentPageId = urlParams.get('parentNoteId');
+      this.spaceId = urlParams.get('spaceId');
       this.notes.parentPageId=this.parentPageId;
     }
     this.$root.$on('display-treeview-items', () => {
@@ -172,6 +185,7 @@ export default {
         editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${note.name}</a>`);
       }
     });
+    this.displayFormTitle();
   },
   computed: {
     publishAndPostButtonText() {
@@ -260,6 +274,7 @@ export default {
         extraPlugins = 'simpleLink,selectImage';
       }
       CKEDITOR.addCss('.cke_editable { font-size: 14px;}');
+      CKEDITOR.addCss('.placeholder { color: #a8b3c5!important;}');
 
       // this line is mandatory when a custom skin is defined
 
@@ -327,6 +342,7 @@ export default {
               });
 
             self.$root.$applicationLoaded();
+            window.setTimeout(() => self.setFocus(), 50);
           },
           change: function (evt) {
             self.notes.content = evt.editor.getData();
@@ -341,6 +357,36 @@ export default {
         }
       });
       this.instance =CKEDITOR.instances['notesContent'];
+    },
+    setToolBarEffect() {
+      const element = CKEDITOR.instances['notesContent'] ;
+      const elementNewTop = document.getElementById('notesTop');
+      element.on('contentDom', function () {
+        this.document.on('click', function(){
+          elementNewTop.classList.add('darkComposerEffect');
+        });
+      });
+      element.on('contentDom', function () {
+        this.document.on('keyup', function(){
+          elementNewTop.classList.add('darkComposerEffect');
+        });
+      });
+      $('#notesEditor').parent().click(() => {
+        elementNewTop.classList.remove('darkComposerEffect');
+        elementNewTop.classList.add('greyComposerEffect');
+      });
+      $('#notesEditor').parent().keyup(() => {
+        elementNewTop.classList.remove('darkComposerEffect');
+        elementNewTop.classList.add('greyComposerEffect');
+      });
+    },
+    setFocus() {
+      if (CKEDITOR.instances['notesContent']) {
+        CKEDITOR.instances['notesContent'].status = 'ready';
+        window.setTimeout(() => {
+          this.$nextTick().then(() => CKEDITOR.instances['notesContent'].focus());
+        }, 200);
+      }
     },
     validateForm() {
       if (!this.notes.title) {
@@ -373,6 +419,15 @@ export default {
       this.type=message.type;
       this.alert = true;
       window.setTimeout(() => this.alert = false, 5000);
+    },
+    displayFormTitle: function() {
+      if (this.noteId) {
+        this.notesFormTitle = this.$t('notes.edit.editNotes');
+      } else {
+        return this.$spaceService.getSpaceById(this.spaceId).then(space => {
+          this.notesFormTitle = this.$t('notes.composer.createNotes').replace('{0}', space.displayName);
+        });
+      }
     },
   }
 };
