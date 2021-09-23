@@ -558,17 +558,17 @@ public class NoteServiceImpl implements NoteService {
   }
 
   @Override
-  public DraftPage updateDraftForExistPage(DraftPage draftPage, Page targetPage, String revision, long clientTime, String username) throws WikiException {
+  public DraftPage updateDraftForExistPage(DraftPage draftNoteToUpdate, Page targetPage, String revision, long clientTime, String username) throws WikiException {
     // Create suffix for draft name
     String draftSuffix = getDraftNameSuffix(clientTime);
 
     DraftPage newDraftPage = new DraftPage();
-    newDraftPage.setId(draftPage.getId());
+    newDraftPage.setId(draftNoteToUpdate.getId());
     newDraftPage.setName(targetPage.getName() + "_" + draftSuffix);
     newDraftPage.setNewPage(false);
-    newDraftPage.setTitle(draftPage.getTitle());
-    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
-    newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setTitle(draftNoteToUpdate.getTitle());
+    newDraftPage.setTargetPageId(draftNoteToUpdate.getTargetPageId());
+    newDraftPage.setContent(draftNoteToUpdate.getContent());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
     if (StringUtils.isEmpty(revision)) {
@@ -588,18 +588,18 @@ public class NoteServiceImpl implements NoteService {
   }
 
   @Override
-  public DraftPage updateDraftForNewPage(DraftPage draftPage, long clientTime) throws WikiException {
+  public DraftPage updateDraftForNewPage(DraftPage draftNoteToUpdate, long clientTime) throws WikiException {
     // Create suffix for draft name
     String draftSuffix = getDraftNameSuffix(clientTime);
 
     DraftPage newDraftPage = new DraftPage();
-    newDraftPage.setId(draftPage.getId());
+    newDraftPage.setId(draftNoteToUpdate.getId());
     newDraftPage.setName(UNTITLED_PREFIX + draftSuffix);
     newDraftPage.setNewPage(true);
-    newDraftPage.setTitle(draftPage.getTitle());
-    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
+    newDraftPage.setTitle(draftNoteToUpdate.getTitle());
+    newDraftPage.setTargetPageId(draftNoteToUpdate.getTargetPageId());
     newDraftPage.setTargetPageRevision("1");
-    newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setContent(draftNoteToUpdate.getContent());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
 

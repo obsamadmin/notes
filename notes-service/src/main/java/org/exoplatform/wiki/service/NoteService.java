@@ -272,11 +272,49 @@ public interface NoteService {
 
   Page getNoteByRootPermission(String noteBookType, String noteBookOwner, String noteId) throws WikiException;
 
-  DraftPage updateDraftForExistPage(DraftPage draftNoteToSave, Page targetNote, String revision, long currentTimeMillis, String userName) throws WikiException;
+  /**
+   * Update draft note for an existing page
+   * 
+   * @param draftNoteToUpdate The draft note to be updated
+   * @param targetNote The target note of the draft 
+   * @param revision The revision which is used for creating the draft page. If "null", this will be the last revision.
+   * @param currentTimeMillis 
+   * @param userName The author name
+   * @return Updated draft 
+   * @throws WikiException
+   */
+  DraftPage updateDraftForExistPage(DraftPage draftNoteToUpdate, Page targetNote, String revision, long currentTimeMillis, String userName) throws WikiException;
 
-  DraftPage updateDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
+  /**
+   * Update draft note for a new page
+   * 
+   * @param draftNoteToUpdate the draft note to be updated
+   * @param currentTimeMillis
+   * @return Updated draft
+   * @throws WikiException
+   */
+  DraftPage updateDraftForNewPage(DraftPage draftNoteToUpdate, long currentTimeMillis) throws WikiException;
 
+  /**
+   * Creates a draft for an existing page
+   * 
+   * @param draftNoteToSave The draft note to be created
+   * @param targetNote The target note of the draft
+   * @param revision The revision which is used for creating the draft page. If "null", this will be the last revision.
+   * @param currentTimeMillis
+   * @param username The author name
+   * @return Created draft
+   * @throws WikiException
+   */
   DraftPage createDraftForExistPage(DraftPage draftNoteToSave, Page targetNote, String revision, long currentTimeMillis, String username) throws WikiException;
 
+  /**
+   * Creates a draft for a new page
+   * 
+   * @param draftNoteToSave The draft note to be created
+   * @param currentTimeMillis
+   * @return Created draft
+   * @throws WikiException
+   */
   DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
 }
