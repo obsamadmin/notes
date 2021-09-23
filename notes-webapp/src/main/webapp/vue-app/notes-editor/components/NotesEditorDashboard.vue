@@ -272,7 +272,6 @@ export default {
             content: this.note.content,
             author: this.note.author,
             owner: this.note.owner,
-            canEdit: this.note.canEdit,
             breadcrumb: this.note.breadcrumb,
             toBePublished: this.note.toBePublished,
           };
