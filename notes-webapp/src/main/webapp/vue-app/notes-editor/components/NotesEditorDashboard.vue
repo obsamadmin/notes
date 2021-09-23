@@ -19,7 +19,7 @@
             <div class="notesFormRightActions pr-7">
               <p class="draftSavingStatus mr-7">{{ draftSavingStatus }}</p>
               <button
-                :disabled="canPostOrUpdateAndPublish"
+                :disabled="!canPostOrUpdateAndPublish"
                 id="notesUpdateAndPost"
                 class="btn btn-primary primary px-2 py-0"
                 @click="postNote(false)">
@@ -33,7 +33,7 @@
               </button>
               <v-menu
                 v-model="publishAndPost"
-                :disabled="canPostOrUpdateAndPublish"
+                :disabled="!canPostOrUpdateAndPublish"
                 :attach="'#notesUpdateAndPost'"
                 transition="scroll-y-transition"
                 content-class="publish-and-post-btn width-full"
@@ -144,7 +144,7 @@ export default {
       }
     },
     publishButtonText() {
-      if (this.note.targetPageId || this.note.id) {
+      if (this.note.targetPageId && this.note.id) {
         return this.$t('notes.button.update');
       } else {
         return this.$t('notes.button.publish');
@@ -154,7 +154,7 @@ export default {
       return this.initDone && (this.initActualNoteDone || !this.noteId);
     },
     canPostOrUpdateAndPublish() {
-      return !this.note.draftPage;
+      return !this.savingDraft && this.note.draftPage && this.note.id;
     },
   },
   watch: {
@@ -559,6 +559,21 @@ export default {
     deleteDraftNote(draftNote) {
       this.$notesService.deleteDraftNote(draftNote).then(() => {
         this.draftSavingStatus = '';
+        //re-initialize data
+        this.note = {
+          id: '',
+          title: '',
+          content: '',
+          parentPageId: this.parentPageId,
+          draftPage: true,
+        };
+        this.actualNote = {
+          id: '',
+          title: '',
+          content: '',
+          parentPageId: this.parentPageId,
+          draftPage: true,
+        };
       }).catch(e => {
         console.error('Error when deleting note', e);
       });
