@@ -274,9 +274,9 @@ public interface NoteService {
 
   DraftPage updateDraftForExistPage(DraftPage draftNoteToSave, Page targetNote, String revision, long currentTimeMillis, String userName) throws WikiException;
 
-  DraftPage updateDraftForNewPage(DraftPage draftNoteToSave, Page parentNote, long currentTimeMillis) throws WikiException;
+  DraftPage updateDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
 
   DraftPage createDraftForExistPage(DraftPage draftNoteToSave, Page targetNote, String revision, long currentTimeMillis, String username) throws WikiException;
 
-  DraftPage createDraftForNewPage(DraftPage draftNoteToSave, Page parentNote, long currentTimeMillis) throws WikiException;
+  DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
 }

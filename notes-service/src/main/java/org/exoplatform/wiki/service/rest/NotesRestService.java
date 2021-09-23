@@ -255,7 +255,7 @@ public class NotesRestService implements ResourceContainer {
 
     String noteBookType = draftNoteToSave.getWikiType();
     String noteBookOwner = draftNoteToSave.getWikiOwner();
-    Page parentNote = null;
+    Page parentNote;
     Page targetNote = null;
     try {
       Identity identity = ConversationState.getCurrent().getIdentity();
@@ -292,13 +292,13 @@ public class NotesRestService implements ResourceContainer {
         if (targetNote != null) {
           draftNoteToSave = noteService.updateDraftForExistPage(draftNoteToSave, targetNote, null, System.currentTimeMillis(), currentUser);
         } else {
-          draftNoteToSave = noteService.updateDraftForNewPage(draftNoteToSave, parentNote, System.currentTimeMillis());
+          draftNoteToSave = noteService.updateDraftForNewPage(draftNoteToSave, System.currentTimeMillis());
         }
       } else {
         if (targetNote != null) {
           draftNoteToSave = noteService.createDraftForExistPage(draftNoteToSave, targetNote, null, System.currentTimeMillis(), currentUser);
         } else {
-          draftNoteToSave = noteService.createDraftForNewPage(draftNoteToSave, parentNote, System.currentTimeMillis());
+          draftNoteToSave = noteService.createDraftForNewPage(draftNoteToSave, System.currentTimeMillis());
         }
       }
 

@@ -42,7 +42,7 @@ public class NoteServiceImpl implements NoteService {
 
   public static final String                              ATT_CACHE_NAME                   = "wiki.PageAttachmentCache";
 
-  private static final String UNTITLED_PREFIX = "Untitled_";
+  private static final String                             UNTITLED_PREFIX                  = "Untitled_";
 
   private static final Log                                log                              =
                                                               ExoLogger.getLogger(NoteServiceImpl.class);
@@ -588,7 +588,7 @@ public class NoteServiceImpl implements NoteService {
   }
 
   @Override
-  public DraftPage updateDraftForNewPage(DraftPage draftPage, Page parentPage, long clientTime) throws WikiException {
+  public DraftPage updateDraftForNewPage(DraftPage draftPage, long clientTime) throws WikiException {
     // Create suffix for draft name
     String draftSuffix = getDraftNameSuffix(clientTime);
 
@@ -617,14 +617,14 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setName(targetPage.getName() + "_" + draftSuffix);
     newDraftPage.setNewPage(false);
     newDraftPage.setTitle(draftPage.getTitle());
-    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
+    newDraftPage.setTargetPageId(targetPage.getId());
     newDraftPage.setContent(draftPage.getContent());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
     if (StringUtils.isEmpty(revision)) {
       List<PageHistory> versions = getVersionsHistoryOfNote(targetPage, username);
       if (versions != null && !versions.isEmpty()) {
-        newDraftPage.setTargetPageRevision(versions.get(0).getContent());
+        newDraftPage.setTargetPageRevision(String.valueOf(versions.get(0).getVersionNumber()));
       } else {
         newDraftPage.setTargetPageRevision("1");
       }
@@ -638,7 +638,7 @@ public class NoteServiceImpl implements NoteService {
   }
 
   @Override
-  public DraftPage createDraftForNewPage(DraftPage draftPage, Page parentPage, long clientTime) throws WikiException {
+  public DraftPage createDraftForNewPage(DraftPage draftPage, long clientTime) throws WikiException {
     // Create suffix for draft name
     String draftSuffix = getDraftNameSuffix(clientTime);
 
