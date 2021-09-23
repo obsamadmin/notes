@@ -21,7 +21,6 @@ import org.exoplatform.wiki.service.BreadcrumbData;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 @Data
 public class Page {
@@ -66,12 +65,18 @@ public class Page {
 
   private boolean isMinorEdit;
 
+  private boolean isDraftPage = isDraftPage();
+
   public boolean isToBePublished() {
     return toBePublished;
   }
 
   public void setToBePublished(boolean toBePublished) {
     this.toBePublished = toBePublished;
+  }
+  
+  public boolean isDraftPage() {
+    return false;
   }
 
   private boolean toBePublished;

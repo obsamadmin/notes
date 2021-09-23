@@ -16,19 +16,19 @@
  */
 package org.exoplatform.wiki.service;
 
-import java.util.List;
-
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.wiki.WikiException;
-import org.exoplatform.wiki.mow.api.*;
-import org.exoplatform.wiki.service.impl.SpaceBean;
-import org.exoplatform.wiki.service.listener.PageWikiListener;
+import org.exoplatform.wiki.mow.api.DraftPage;
+import org.exoplatform.wiki.mow.api.Page;
+import org.exoplatform.wiki.mow.api.PageHistory;
+import org.exoplatform.wiki.mow.api.Wiki;
 import org.gatein.api.EntityNotFoundException;
+
+import java.util.List;
 
 /**
  * Provides functions for processing database with notes, including:
  * adding, editing, removing and searching for data.
- *
  */
 public interface NoteService {
 
@@ -135,6 +135,15 @@ public interface NoteService {
    * @throws WikiException if an error occured
    */
   public Page getNoteById(String id) throws WikiException;
+
+  /**
+   * Gets a draft note based on its unique id.
+   *
+   * @param id Unique id of the draft note.
+   * @return The note.
+   * @throws WikiException if an error occured
+   */
+  public DraftPage getDraftNoteById(String id) throws WikiException;
 
 
   Page getNoteById(String id, Identity userIdentity) throws IllegalAccessException, WikiException;
@@ -262,4 +271,12 @@ public interface NoteService {
   boolean isExisting(String noteBookType, String noteBookOwner, String noteId) throws WikiException;
 
   Page getNoteByRootPermission(String noteBookType, String noteBookOwner, String noteId) throws WikiException;
+
+  DraftPage updateDraftForExistPage(DraftPage draftNoteToSave, Page targetNote, String revision, long currentTimeMillis, String userName) throws WikiException;
+
+  DraftPage updateDraftForNewPage(DraftPage draftNoteToSave, Page parentNote, long currentTimeMillis) throws WikiException;
+
+  DraftPage createDraftForExistPage(DraftPage draftNoteToSave, Page targetNote, String revision, long currentTimeMillis, String username) throws WikiException;
+
+  DraftPage createDraftForNewPage(DraftPage draftNoteToSave, Page parentNote, long currentTimeMillis) throws WikiException;
 }

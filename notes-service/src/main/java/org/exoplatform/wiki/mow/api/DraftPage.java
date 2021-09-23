@@ -42,4 +42,9 @@ public class DraftPage extends Page {
   public void setChanges(DiffResult changes) {
     this.changes = changes;
   }
+  
+  @Override
+  public boolean isDraftPage() {
+    return true;
+  }
 }

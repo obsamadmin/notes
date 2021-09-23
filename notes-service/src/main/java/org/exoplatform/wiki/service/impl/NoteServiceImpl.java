@@ -1,20 +1,7 @@
 package org.exoplatform.wiki.service.impl;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
-import org.exoplatform.social.common.service.HTMLUploadImageProcessor;
-import org.exoplatform.social.core.manager.IdentityManager;
-import org.exoplatform.social.core.identity.provider.OrganizationIdentityProvider;
-import org.exoplatform.social.core.space.model.Space;
-import org.exoplatform.social.core.space.spi.SpaceService;
-import org.exoplatform.wiki.utils.Utils;
-import org.gatein.api.EntityNotFoundException;
-
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.portal.config.UserACL;
@@ -25,7 +12,11 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 import org.exoplatform.services.organization.OrganizationService;
 import org.exoplatform.services.security.Identity;
-import org.exoplatform.services.security.IdentityConstants;
+import org.exoplatform.social.common.service.HTMLUploadImageProcessor;
+import org.exoplatform.social.core.identity.provider.OrganizationIdentityProvider;
+import org.exoplatform.social.core.manager.IdentityManager;
+import org.exoplatform.social.core.space.model.Space;
+import org.exoplatform.social.core.space.spi.SpaceService;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.mow.api.*;
 import org.exoplatform.wiki.rendering.cache.AttachmentCountData;
@@ -34,7 +25,15 @@ import org.exoplatform.wiki.rendering.cache.MarkupKey;
 import org.exoplatform.wiki.resolver.TitleResolver;
 import org.exoplatform.wiki.service.*;
 import org.exoplatform.wiki.service.listener.PageWikiListener;
+import org.exoplatform.wiki.utils.Utils;
 import org.exoplatform.wiki.utils.WikiConstants;
+import org.gatein.api.EntityNotFoundException;
+
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class NoteServiceImpl implements NoteService {
 
@@ -42,6 +41,8 @@ public class NoteServiceImpl implements NoteService {
   public static final String                              CACHE_NAME                       = "wiki.PageRenderingCache";
 
   public static final String                              ATT_CACHE_NAME                   = "wiki.PageAttachmentCache";
+
+  private static final String UNTITLED_PREFIX = "Untitled_";
 
   private static final Log                                log                              =
                                                               ExoLogger.getLogger(NoteServiceImpl.class);
@@ -373,6 +374,7 @@ public class NoteServiceImpl implements NoteService {
     }
     return page;
   }
+
   @Override
   public Page getNoteOfNoteBookByName(String noteType,
                                       String noteOwner,
@@ -401,6 +403,15 @@ public class NoteServiceImpl implements NoteService {
     }
 
     return dataStorage.getPageById(id);
+  }
+
+  @Override
+  public DraftPage getDraftNoteById(String id) throws WikiException {
+    if (id == null) {
+      return null;
+    }
+
+    return dataStorage.getDraftPageById(id);
   }
 
   @Override
@@ -546,6 +557,106 @@ public class NoteServiceImpl implements NoteService {
     return dataStorage.getPageOfWikiByName(noteBookType, noteBookOwner, noteId);
   }
 
+  @Override
+  public DraftPage updateDraftForExistPage(DraftPage draftPage, Page targetPage, String revision, long clientTime, String username) throws WikiException {
+    // Create suffix for draft name
+    String draftSuffix = getDraftNameSuffix(clientTime);
+
+    DraftPage newDraftPage = new DraftPage();
+    newDraftPage.setId(draftPage.getId());
+    newDraftPage.setName(targetPage.getName() + "_" + draftSuffix);
+    newDraftPage.setNewPage(false);
+    newDraftPage.setTitle(draftPage.getTitle());
+    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
+    newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setCreatedDate(new Date(clientTime));
+    newDraftPage.setUpdatedDate(new Date(clientTime));
+    if (StringUtils.isEmpty(revision)) {
+      List<PageHistory> versions = getVersionsHistoryOfNote(targetPage, username);
+      if (versions != null && !versions.isEmpty()) {
+        newDraftPage.setTargetPageRevision(versions.get(0).getContent());
+      } else {
+        newDraftPage.setTargetPageRevision("1");
+      }
+    } else {
+      newDraftPage.setTargetPageRevision(revision);
+    }
+
+    newDraftPage = dataStorage.updateDraftPageForUser(newDraftPage, Utils.getCurrentUser());
+
+    return newDraftPage;
+  }
+
+  @Override
+  public DraftPage updateDraftForNewPage(DraftPage draftPage, Page parentPage, long clientTime) throws WikiException {
+    // Create suffix for draft name
+    String draftSuffix = getDraftNameSuffix(clientTime);
+
+    DraftPage newDraftPage = new DraftPage();
+    newDraftPage.setId(draftPage.getId());
+    newDraftPage.setName(UNTITLED_PREFIX + draftSuffix);
+    newDraftPage.setNewPage(true);
+    newDraftPage.setTitle(draftPage.getTitle());
+    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
+    newDraftPage.setTargetPageRevision("1");
+    newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setCreatedDate(new Date(clientTime));
+    newDraftPage.setUpdatedDate(new Date(clientTime));
+
+    newDraftPage = dataStorage.updateDraftPageForUser(newDraftPage, Utils.getCurrentUser());
+
+    return newDraftPage;
+  }
+
+  @Override
+  public DraftPage createDraftForExistPage(DraftPage draftPage, Page targetPage, String revision, long clientTime, String username) throws WikiException {
+    // Create suffix for draft name
+    String draftSuffix = getDraftNameSuffix(clientTime);
+
+    DraftPage newDraftPage = new DraftPage();
+    newDraftPage.setName(targetPage.getName() + "_" + draftSuffix);
+    newDraftPage.setNewPage(false);
+    newDraftPage.setTitle(draftPage.getTitle());
+    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
+    newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setCreatedDate(new Date(clientTime));
+    newDraftPage.setUpdatedDate(new Date(clientTime));
+    if (StringUtils.isEmpty(revision)) {
+      List<PageHistory> versions = getVersionsHistoryOfNote(targetPage, username);
+      if (versions != null && !versions.isEmpty()) {
+        newDraftPage.setTargetPageRevision(versions.get(0).getContent());
+      } else {
+        newDraftPage.setTargetPageRevision("1");
+      }
+    } else {
+      newDraftPage.setTargetPageRevision(revision);
+    }
+
+    newDraftPage = dataStorage.createDraftPageForUser(newDraftPage, Utils.getCurrentUser());
+
+    return newDraftPage;
+  }
+
+  @Override
+  public DraftPage createDraftForNewPage(DraftPage draftPage, Page parentPage, long clientTime) throws WikiException {
+    // Create suffix for draft name
+    String draftSuffix = getDraftNameSuffix(clientTime);
+
+    DraftPage newDraftPage = new DraftPage();
+    newDraftPage.setName(UNTITLED_PREFIX + draftSuffix);
+    newDraftPage.setNewPage(true);
+    newDraftPage.setTitle(draftPage.getTitle());
+    newDraftPage.setTargetPageId(draftPage.getTargetPageId());
+    newDraftPage.setTargetPageRevision("1");
+    newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setCreatedDate(new Date(clientTime));
+    newDraftPage.setUpdatedDate(new Date(clientTime));
+
+    newDraftPage = dataStorage.createDraftPageForUser(newDraftPage, Utils.getCurrentUser());
+
+    return newDraftPage;
+  }
+
   protected void invalidateCache(Page page) {
     WikiPageParams params = new WikiPageParams(page.getWikiType(), page.getWikiOwner(), page.getName());
     List<WikiPageParams> linkedPages = pageLinksMap.get(params);
@@ -675,6 +786,7 @@ public class NoteServiceImpl implements NoteService {
       }
     }
   }
+
   public void postOpenByTree(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
     List<PageWikiListener> listeners = wikiService.getPageListeners();
     for (PageWikiListener l : listeners) {
@@ -687,6 +799,7 @@ public class NoteServiceImpl implements NoteService {
       }
     }
   }
+
   public void postOpenByBreadCrumb(String wikiType, String wikiOwner, String pageId, Page page) throws WikiException {
     List<PageWikiListener> listeners = wikiService.getPageListeners();
     for (PageWikiListener l : listeners) {
@@ -765,6 +878,10 @@ public class NoteServiceImpl implements NoteService {
     }
 
     return list;
+  }
+
+  private String getDraftNameSuffix(long clientTime) {
+    return new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date(clientTime));
   }
 
 }

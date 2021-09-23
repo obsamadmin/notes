@@ -70,7 +70,7 @@
           </div>
           <div class="notes-last-update-info">
             <span class="note-version border-radius primary px-2 font-weight-bold me-2 caption clickable" @click="$refs.noteVersionsHistoryDrawer.open(noteVersions)">V{{ lastNoteVersion }}</span>
-            <span class="caption text-sub-title font-italic">{{ $t('notes.label.LastModifiedBy', {0: lastNotesUpdatebBy, 1: displayedDate}) }}</span>
+            <span class="caption text-sub-title font-italic">{{ $t('notes.label.LastModifiedBy', {0: lastNoteUpdatebBy, 1: displayedDate}) }}</span>
           </div>
         </div>
         <v-divider class="my-4" />
@@ -195,7 +195,7 @@ export default {
         return this.actualVersion.versionNumber;
       }
     },
-    lastNotesUpdatebBy() {
+    lastNoteUpdatebBy() {
       if ( this.displayLastVersion ) {
         return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].authorFullName;
       } else {
@@ -313,7 +313,7 @@ export default {
         const note = data || [];
         this.getNoteByName(note.name, source);
       }).catch(e => {
-        console.error('Error when getting notes', e);
+        console.error('Error when getting note', e);
         this.existingNote = false;
       }).finally(() => {
         this.$root.$applicationLoaded();
@@ -328,7 +328,7 @@ export default {
         window.history.pushState('notes', '', notesConstants.PORTAL_BASE_URL);
         return this.$nextTick();
       }).catch(e => {
-        console.error('Error when getting notes', e);
+        console.error('Error when getting note', e);
         this.existingNote = false;
       }).finally(() => {
         this.$root.$applicationLoaded();

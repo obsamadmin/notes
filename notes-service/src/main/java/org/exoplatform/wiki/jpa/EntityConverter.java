@@ -2,8 +2,8 @@ package org.exoplatform.wiki.jpa;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
-import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.model.FileInfo;
+import org.exoplatform.commons.file.model.FileItem;
 import org.exoplatform.commons.file.services.FileService;
 import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
@@ -15,7 +15,6 @@ import org.exoplatform.wiki.mow.api.*;
 import org.exoplatform.wiki.service.IDType;
 
 import java.io.ByteArrayInputStream;
-
 import java.util.*;
 
 /**
@@ -369,6 +368,9 @@ public class EntityConverter {
     DraftPageEntity draftPageEntity = null;
     if (draftPage != null) {
       draftPageEntity = new DraftPageEntity();
+      if (StringUtils.isNotEmpty(draftPage.getId())) {
+        draftPageEntity.setId(Long.parseLong(draftPage.getId()));
+      }
       draftPageEntity.setName(draftPage.getName());
       draftPageEntity.setTitle(draftPage.getTitle());
       draftPageEntity.setAuthor(draftPage.getAuthor());

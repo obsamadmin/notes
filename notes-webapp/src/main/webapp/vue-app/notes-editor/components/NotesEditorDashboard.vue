@@ -17,10 +17,12 @@
               <span class="notesFormTitle ps-2">{{ notesFormTitle }}</span>
             </div>
             <div class="notesFormRightActions pr-7">
+              <p class="draftSavingStatus mr-7">{{ draftSavingStatus }}</p>
               <button
+                :disabled="canPostOrUpdateAndPublish"
                 id="notesUpdateAndPost"
                 class="btn btn-primary primary px-2 py-0"
-                @click="postNotes(false)">
+                @click="postNote(false)">
                 {{ publishButtonText }}
                 <v-icon
                   id="notesPublichAndPost"
@@ -31,13 +33,14 @@
               </button>
               <v-menu
                 v-model="publishAndPost"
+                :disabled="canPostOrUpdateAndPublish"
                 :attach="'#notesUpdateAndPost'"
                 transition="scroll-y-transition"
                 content-class="publish-and-post-btn width-full"
                 offset-y
                 left>
                 <v-list-item
-                  @click.stop="postNotes(true)"
+                  @click.stop="postNote(true)"
                   class="px-2">
                   <v-icon
                     size="19"
@@ -58,7 +61,7 @@
           <div class="formInputGroup notesTitle mx-3">
             <input
               id="notesTitle"
-              v-model="notes.title"
+              v-model="note.title"
               :placeholder="notesTitlePlaceholder"
               type="text"
               class="py-0 px-1 mt-5 mb-0">
@@ -66,7 +69,7 @@
           <div class="formInputGroup white overflow-auto flex notes-content-wrapper">
             <textarea
               id="notesContent"
-              v-model="notes.content"
+              v-model="note.content"
               :placeholder="notesBodyPlaceholder"
               class="notesFormInput"
               name="notesContent">
@@ -97,7 +100,14 @@ export default {
   },
   data() {
     return {
-      notes: {
+      note: {
+        id: '',
+        title: '',
+        content: '',
+        parentPageId: '',
+        draftPage: true,
+      },
+      actualNote: {
         id: '',
         title: '',
         content: '',
@@ -115,16 +125,65 @@ export default {
       notesBodyPlaceholder: `${this.$t('notes.body.placeholderContentInput')}*`,
       publishAndPost: false,
       spaceId: '',
-      notesFormTitle: '',
+      noteFormTitle: '',
+      postingNote: false,
+      savingDraft: false,
+      initDone: false,
+      initActualNoteDone: false,
+      draftSavingStatus: '',
+      autoSaveDelay: 1000,
+      saveDraft: '',
     };
   },
-  mounted() {
-    this.initCKEditor();
-    const elementNewTop = document.getElementById('notesTop');
-    elementNewTop.classList.add('darkComposerEffect');
-    this.setToolBarEffect();
+  computed: {
+    publishAndPostButtonText() {
+      if (this.note.id) {
+        return this.$t('notes.button.updateAndPost');
+      } else {
+        return this.$t('notes.button.publishAndPost');
+      }
+    },
+    publishButtonText() {
+      if (this.note.targetPageId || this.note.id) {
+        return this.$t('notes.button.update');
+      } else {
+        return this.$t('notes.button.publish');
+      }
+    },
+    initCompleted() {
+      return this.initDone && (this.initActualNoteDone || !this.noteId);
+    },
+    canPostOrUpdateAndPublish() {
+      return !this.note.draftPage;
+    },
+  },
+  watch: {
+    'note.title'() {
+      if (this.note.title !== this.actualNote.title) {
+        this.autoSave();
+      }
+    },
+    'note.content'() {
+      if (this.note.content !== this.actualNote.content) {
+        this.autoSave();
+      }
+    },
   },
   created() {
+    const queryPath = window.location.search;
+    const urlParams = new URLSearchParams(queryPath);
+    if (urlParams.has('appName')) {
+      this.appName = urlParams.get('appName');
+    }
+    if (urlParams.has('noteId')) {
+      this.noteId = urlParams.get('noteId');
+      this.getNote(this.noteId);
+    } else if (urlParams.has('parentNoteId')) {
+      this.parentPageId = urlParams.get('parentNoteId');
+      this.spaceId = urlParams.get('spaceId');
+      this.note.parentPageId = this.parentPageId;
+    }
+    this.displayFormTitle();
     $(document).on('mousedown', () => {
       if (this.publishAndPost) {
         window.setTimeout(() => {
@@ -139,24 +198,11 @@ export default {
       this.$refs.noteTablePlugins.open();
     });
     this.$root.$on('updateData', data => {
-      this.notes.content= data;
+      this.note.content= data;
     });
     this.$root.$on('show-alert', message => {
       this.displayMessage(message);
     });
-    const queryPath = window.location.search;
-    const urlParams = new URLSearchParams(queryPath);
-    if ( urlParams.has('appName') ){
-      this.appName = urlParams.get('appName');
-    }
-    if ( urlParams.has('noteId') ){
-      this.noteId = urlParams.get('noteId');
-      this.getNotes(this.noteId);
-    } else if (urlParams.has('parentNoteId')){
-      this.parentPageId = urlParams.get('parentNoteId');
-      this.spaceId = urlParams.get('spaceId');
-      this.notes.parentPageId=this.parentPageId;
-    }
     this.$root.$on('display-treeview-items', () => {
       if ( urlParams.has('noteId') ) {
         this.$refs.noteTreeview.open(this.noteId, 'includePages');
@@ -185,48 +231,76 @@ export default {
         editor.insertHtml(`<a href='${note.noteId}' class='noteLink' target='_blank'>${note.name}</a>`);
       }
     });
-    this.displayFormTitle();
   },
-  computed: {
-    publishAndPostButtonText() {
-      if (this.notes.id) {
-        return this.$t('notes.button.updateAndPost');
-      } else {
-        return this.$t('notes.button.publishAndPost');
-      }
-    },
-    publishButtonText() {
-      if (this.notes.id) {
-        return this.$t('notes.button.update');
-      } else {
-        return this.$t('notes.button.publish');
-      }
-    },
+  mounted() {
+    this.init();
   }, 
   methods: {
-    getNotes(id) {
-      return this.$notesService.getNoteById(id).then(data => {
-        this.notes = data || [];
-      });
+    init() {
+      this.initCKEditor();
+      const elementNewTop = document.getElementById('notesTop');
+      elementNewTop.classList.add('darkComposerEffect');
+      this.setToolBarEffect();
+      this.initDone = true;
     },
-    postNotes(toPost){
-      if (this.validateForm()){
-        const notes = {
-          id: this.notes.id,
-          title: this.notes.title,
-          name: this.notes.name,
-          wikiType: this.notes.wikiType,
-          wikiOwner: this.notes.wikiOwner,
-          content: this.notes.content,
-          parentPageId: this.notes.parentPageId,
-          toBePublished: toPost,
+    autoSave() {
+      // No draft saving if init not done or in edit mode for the moment
+      if (!this.initCompleted) {
+        return;
+      }
+      // if the Note is being posted, no need to autosave anymore
+      if (this.postingNote) {
+        return;
+      }
+      clearTimeout(this.saveDraft);
+      this.saveDraft = setTimeout(() => {
+        this.savingDraft = true;
+        this.draftSavingStatus = this.$t('notes.draft.savingDraftStatus'); //todo
+        this.$nextTick(() => {
+          this.saveNoteDraft();
+        });
+      }, this.autoSaveDelay);
+    },
+    getNote(id) {
+      return this.$notesService.getNoteById(id).then(data => {
+        if (data) {
+          this.note = data;
+          this.actualNote = {
+            id: this.note.id,
+            name: this.note.name,
+            title: this.note.title,
+            content: this.note.content,
+            author: this.note.author,
+            owner: this.note.owner,
+            canEdit: this.note.canEdit,
+            breadcrumb: this.note.breadcrumb,
+            toBePublished: this.note.toBePublished,
+          };
+        }
+      }).finally(() => this.initActualNoteDone = true);
+    },
+    postNote(toPublish) {
+      this.postingNote = true;
+      clearTimeout(this.saveDraft);
+      if (this.validateForm()) {
+        const note = {
+          id: this.note.targetPageId ? this.note.targetPageId : null,
+          title: this.note.title,
+          name: this.note.name,
+          wikiType: this.note.wikiType,
+          wikiOwner: this.note.wikiOwner,
+          content: this.note.content,
+          parentPageId: this.parentPageId,
+          toBePublished: toPublish,
           appName: this.appName,
         };
         let notePath = '';
-        if (this.notes.id){
-          this.$notesService.updateNoteById(notes).then(data => {
-            notePath = this.$notesService.getPathByNoteOwner(data,this.appName).replace(/ /g, '_');
-            window.location.href= notePath;
+        if (note.id) {
+          this.$notesService.updateNoteById(note).then(data => {
+            notePath = this.$notesService.getPathByNoteOwner(data, this.appName).replace(/ /g, '_');
+            this.postingNote = false;
+            this.draftSavingStatus = '';
+            window.location.href = notePath;
           }).catch(e => {
             console.error('Error when update note page', e);
             this.$root.$emit('show-alert', {
@@ -235,9 +309,20 @@ export default {
             });
           });
         } else {
-          this.$notesService.createNote(notes).then(data => {
-            notePath = this.$notesService.getPathByNoteOwner(data,this.appName).replace(/ /g, '_');
+          this.$notesService.createNote(note).then(data => {
+            notePath = this.$notesService.getPathByNoteOwner(data, this.appName).replace(/ /g, '_');
+            this.postingNote = false;
+            // delete draft note
+            this.deleteDraftNote(this.note);
             window.location.href = notePath;
+          }).then(() => {
+            this.postingNote = false;
+            this.draftSavingStatus = '';
+            this.$notesService.deleteDraftNote(this.note).then(() => {
+              window.location.href = notePath;
+            }).catch(e => {
+              console.error('Error when deleting draft note: ', e);
+            });
           }).catch(e => {
             console.error('Error when creating note page', e);
             this.$root.$emit('show-alert', {
@@ -246,13 +331,57 @@ export default {
             });
           });
         }
-      } 
+      }
     },
     openPublishAndPost(event) {
       this.publishAndPost = !this.publishAndPost;
       if (event) {
         event.preventDefault();
         event.stopPropagation();
+      }
+    },
+    saveNoteDraft() {
+      const draftNote = {
+        id: this.note.id,
+        title: this.note.title,
+        content: this.note.content,
+        name: this.note.name,
+        appName: this.appName,
+        wikiType: this.note.wikiType,
+        wikiOwner: this.note.wikiOwner,
+        parentPageId: this.parentPageId,
+      };
+      if (this.note.draftPage && this.note.id) {
+        draftNote.newPage = false;
+        draftNote.targetPageId = this.note.targetPageId;
+      } else {
+        draftNote.targetPageId = this.note.id ? this.note.id : '';
+        draftNote.newPage = true;
+      }
+      if (this.note.title || this.note.content) {
+        this.$notesService.saveDraftNote(draftNote).then(savedDraftNote => {
+          this.actualNote = {
+            id: savedDraftNote.id,
+            name: savedDraftNote.name,
+            title: savedDraftNote.title,
+            content: savedDraftNote.content,
+            author: savedDraftNote.author,
+            owner: savedDraftNote.owner,
+          };
+          this.note = savedDraftNote;
+        }).finally(() => {
+          this.savingDraft = false;
+          this.draftSavingStatus = this.$t('notes.draft.savedDraftStatus');
+        }).catch(e => {
+          console.error('Error when creating note page', e);
+          this.$root.$emit('show-alert', {
+            type: 'error',
+            message: this.$t(`notes.message.${e.message}`)
+          });
+        });
+      } else {
+        // delete draft
+        this.deleteDraftNote(draftNote);
       }
     },
     closePluginsDrawer() {
@@ -301,15 +430,17 @@ export default {
           { name: 'links', items: [ 'simpleLink','InsertOptions'] },
         ],
         format_tags: 'p;h1;h2;h3',
-        autoGrow_minHeight: self.notesFormContentHeight,
-        height: self.notesFormContentHeight,
+        autoGrow_minHeight: self.noteFormContentHeight,
+        height: self.noteFormContentHeight,
         bodyClass: 'notesContent',
         dialog_noConfirmCancel: true,
         sharedSpaces: {
           top: 'notesTop'
         },
         on: {
-          instanceReady: function() {
+          instanceReady: function (evt) {
+            self.note.content = evt.editor.getData();
+            self.actualNote.content = evt.editor.getData();
             CKEDITOR.instances['notesContent'].removeMenuItem('linkItem');
             CKEDITOR.instances['notesContent'].removeMenuItem('selectImageItem');
 
@@ -319,7 +450,8 @@ export default {
                 return {
                   tableProperties: CKEDITOR.TRISTATE_ON
                 };
-              }});
+              }
+            });
             CKEDITOR.instances['notesContent'].addCommand('tableProperties', {
               exec: function() {
                 if (CKEDITOR.instances['notesContent'].elementPath() && CKEDITOR.instances['notesContent'].elementPath().contains( 'table', 1 )){
@@ -341,7 +473,7 @@ export default {
             window.setTimeout(() => self.setFocus(), 50);
           },
           change: function (evt) {
-            self.notes.content = evt.editor.getData();
+            self.note.content = evt.editor.getData();
           },
           doubleclick: function(evt) {
             const element = evt.data.element;
@@ -385,21 +517,20 @@ export default {
       }
     },
     validateForm() {
-      if (!this.notes.title) {
+      if (!this.note.title) {
         this.$root.$emit('show-alert', {
           type: 'error',
           message: this.$t('notes.message.missingTitle')
         });
         return false;
       }
-      if (!isNaN(this.notes.title)) {
+      if (!isNaN(this.note.title)) {
         this.$root.$emit('show-alert', {
           type: 'error',
           message: this.$t('notes.message.numericTitle')
         });
         return false;
-      }
-      else if (this.notes.title.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length < 3 || this.notes.title.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length > this.titleMaxLength) {
+      } else if (this.note.title.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length < 3 || this.note.title.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length > this.titleMaxLength) {
         this.validateFor=false;
         this.$root.$emit('show-alert', {
           type: 'error',
@@ -418,12 +549,19 @@ export default {
     },
     displayFormTitle: function() {
       if (this.noteId) {
-        this.notesFormTitle = this.$t('notes.edit.editNotes');
+        this.noteFormTitle = this.$t('notes.edit.editNotes');
       } else {
         return this.$spaceService.getSpaceById(this.spaceId).then(space => {
-          this.notesFormTitle = this.$t('notes.composer.createNotes').replace('{0}', space.displayName);
+          this.noteFormTitle = this.$t('notes.composer.createNotes').replace('{0}', space.displayName);
         });
       }
+    },
+    deleteDraftNote(draftNote) {
+      this.$notesService.deleteDraftNote(draftNote).then(() => {
+        this.draftSavingStatus = '';
+      }).catch(e => {
+        console.error('Error when deleting note', e);
+      });
     },
   }
 };
