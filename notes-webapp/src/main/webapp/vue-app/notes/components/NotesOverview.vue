@@ -171,7 +171,6 @@ export default {
   },
   watch: {
     note() {
-
       this.getNoteVersionByNoteId(this.note.id);
       if ( this.note && this.note.breadcrumb && this.note.breadcrumb.length ) {
         this.note.breadcrumb[0].title = this.$t('note.label.noteHome');
