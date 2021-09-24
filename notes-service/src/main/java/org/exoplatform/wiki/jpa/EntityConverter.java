@@ -80,6 +80,10 @@ public class EntityConverter {
         page.setWikiType(wiki.getType());
         page.setWikiOwner(wiki.getOwner());
       }
+      if (pageEntity.getParentPage() != null) {
+        page.setParentPageId(String.valueOf(pageEntity.getParentPage().getId()));
+        page.setParentPageName(pageEntity.getParentPage().getName());
+      }
       page.setTitle(pageEntity.getTitle());
       page.setOwner(pageEntity.getOwner());
       page.setAuthor(pageEntity.getAuthor());
@@ -357,8 +361,12 @@ public class EntityConverter {
       if (targetPage != null) {
         draftPage.setTargetPageId(String.valueOf(targetPage.getId()));
         draftPage.setTargetPageRevision(draftPageEntity.getTargetRevision());
-        draftPage.setWikiType(WikiType.USER.toString());
-        draftPage.setWikiOwner(draftPageEntity.getAuthor());
+        
+        WikiEntity wiki = targetPage.getWiki();
+        if (wiki != null) {
+          draftPage.setWikiType(wiki.getType());
+          draftPage.setWikiOwner(wiki.getOwner());
+        }
       }
     }
     return draftPage;

@@ -437,7 +437,7 @@ public class NoteServiceImpl implements NoteService {
     if (id == null) {
       return null;
     }
-    Page page = null;
+    Page page;
     page = getNoteById(id);
     if (page != null) {
       Space space = spaceService.getSpaceByGroupId(page.getWikiOwner());
@@ -619,6 +619,7 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setTitle(draftPage.getTitle());
     newDraftPage.setTargetPageId(targetPage.getId());
     newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setSyntax(draftPage.getSyntax());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
     if (StringUtils.isEmpty(revision)) {
