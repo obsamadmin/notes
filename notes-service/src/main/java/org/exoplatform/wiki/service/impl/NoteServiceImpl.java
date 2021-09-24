@@ -574,7 +574,7 @@ public class NoteServiceImpl implements NoteService {
     if (StringUtils.isEmpty(revision)) {
       List<PageHistory> versions = getVersionsHistoryOfNote(targetPage, username);
       if (versions != null && !versions.isEmpty()) {
-        newDraftPage.setTargetPageRevision(versions.get(0).getContent());
+        newDraftPage.setTargetPageRevision(String.valueOf(versions.get(0).getVersionNumber()));
       } else {
         newDraftPage.setTargetPageRevision("1");
       }

@@ -19,7 +19,6 @@
             <div class="notesFormRightActions pr-7">
               <p class="draftSavingStatus mr-7">{{ draftSavingStatus }}</p>
               <button
-                :disabled="!canPostOrUpdateAndPublish"
                 id="notesUpdateAndPost"
                 class="btn btn-primary primary px-2 py-0"
                 @click="postNote(false)">
@@ -33,7 +32,6 @@
               </button>
               <v-menu
                 v-model="publishAndPost"
-                :disabled="!canPostOrUpdateAndPublish"
                 :attach="'#notesUpdateAndPost'"
                 transition="scroll-y-transition"
                 content-class="publish-and-post-btn width-full"
@@ -105,7 +103,6 @@ export default {
         title: '',
         content: '',
         parentPageId: '',
-        draftPage: true,
       },
       actualNote: {
         id: '',
@@ -144,7 +141,7 @@ export default {
       }
     },
     publishButtonText() {
-      if (this.note.targetPageId && this.note.id) {
+      if (this.note.id) {
         return this.$t('notes.button.update');
       } else {
         return this.$t('notes.button.publish');
@@ -152,9 +149,6 @@ export default {
     },
     initCompleted() {
       return this.initDone && (this.initActualNoteDone || !this.noteId);
-    },
-    canPostOrUpdateAndPublish() {
-      return !this.savingDraft && this.note.draftPage && this.note.id;
     },
   },
   watch: {
@@ -178,7 +172,8 @@ export default {
     if (urlParams.has('noteId')) {
       this.noteId = urlParams.get('noteId');
       this.getNote(this.noteId);
-    } else if (urlParams.has('parentNoteId')) {
+    }
+    if (urlParams.has('parentNoteId')) {
       this.parentPageId = urlParams.get('parentNoteId');
       this.spaceId = urlParams.get('spaceId');
       this.note.parentPageId = this.parentPageId;
@@ -234,7 +229,7 @@ export default {
   },
   mounted() {
     this.init();
-  }, 
+  },
   methods: {
     init() {
       this.initCKEditor();
@@ -312,10 +307,6 @@ export default {
             notePath = this.$notesService.getPathByNoteOwner(data, this.appName).replace(/ /g, '_');
             this.postingNote = false;
             // delete draft note
-            this.deleteDraftNote(this.note);
-            window.location.href = notePath;
-          }).then(() => {
-            this.postingNote = false;
             this.draftSavingStatus = '';
             this.$notesService.deleteDraftNote(this.note).then(() => {
               window.location.href = notePath;
@@ -341,7 +332,7 @@ export default {
     },
     saveNoteDraft() {
       const draftNote = {
-        id: this.note.id,
+        id: this.note.draftPage ? this.note.id : '',
         title: this.note.title,
         content: this.note.content,
         name: this.note.name,
@@ -357,31 +348,35 @@ export default {
         draftNote.targetPageId = this.note.id ? this.note.id : '';
         draftNote.newPage = true;
       }
+
       if (this.note.title || this.note.content) {
-        this.$notesService.saveDraftNote(draftNote).then(savedDraftNote => {
-          this.actualNote = {
-            id: savedDraftNote.id,
-            name: savedDraftNote.name,
-            title: savedDraftNote.title,
-            content: savedDraftNote.content,
-            author: savedDraftNote.author,
-            owner: savedDraftNote.owner,
-          };
-          this.note = savedDraftNote;
-        }).finally(() => {
-          this.savingDraft = false;
-          this.draftSavingStatus = this.$t('notes.draft.savedDraftStatus');
-        }).catch(e => {
-          console.error('Error when creating note page', e);
-          this.$root.$emit('show-alert', {
-            type: 'error',
-            message: this.$t(`notes.message.${e.message}`)
-          });
-        });
+        this.persistDraftNote(draftNote);
       } else {
         // delete draft
-        this.deleteDraftNote(draftNote);
+        this.deleteDraftNote();
       }
+    },
+    persistDraftNote(draftNote) {
+      this.$notesService.saveDraftNote(draftNote).then(savedDraftNote => {
+        this.actualNote = {
+          id: savedDraftNote.id,
+          name: savedDraftNote.name,
+          title: savedDraftNote.title,
+          content: savedDraftNote.content,
+          author: savedDraftNote.author,
+          owner: savedDraftNote.owner,
+        };
+        this.note = savedDraftNote;
+      }).then(() => {
+        this.savingDraft = false;
+        this.draftSavingStatus = this.$t('notes.draft.savedDraftStatus');
+      }).catch(e => {
+        console.error('Error when creating note page', e);
+        this.$root.$emit('show-alert', {
+          type: 'error',
+          message: this.$t(`notes.message.${e.message}`)
+        });
+      });
     },
     closePluginsDrawer() {
       this.$refs.noteCustomPlugins.close();
@@ -556,26 +551,31 @@ export default {
       }
     },
     deleteDraftNote(draftNote) {
-      this.$notesService.deleteDraftNote(draftNote).then(() => {
-        this.draftSavingStatus = '';
-        //re-initialize data
-        this.note = {
-          id: '',
-          title: '',
-          content: '',
-          parentPageId: this.parentPageId,
-          draftPage: true,
-        };
-        this.actualNote = {
-          id: '',
-          title: '',
-          content: '',
-          parentPageId: this.parentPageId,
-          draftPage: true,
-        };
-      }).catch(e => {
-        console.error('Error when deleting note', e);
-      });
+      if (!draftNote) {
+        draftNote = this.note;
+      }
+      if (this.note.draftPage && this.note.id) {
+        this.$notesService.deleteDraftNote(draftNote).then(() => {
+          this.draftSavingStatus = '';
+          //re-initialize data
+          this.note = {
+            id: '',
+            title: '',
+            content: '',
+            parentPageId: this.parentPageId,
+            draftPage: true,
+          };
+          this.actualNote = {
+            id: '',
+            title: '',
+            content: '',
+            parentPageId: this.parentPageId,
+            draftPage: true,
+          };
+        }).catch(e => {
+          console.error('Error when deleting draft note', e);
+        });
+      }
     },
   }
 };
