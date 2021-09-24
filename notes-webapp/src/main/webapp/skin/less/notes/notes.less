@@ -282,6 +282,31 @@
   }
 }
 
+.noteHistoryDrawer  {
+  .drawerContent {
+    .history-line {
+      &:after {
+        display: none!important;
+      }
+      &:hover {
+        background-color: @tableBackgroundAccent;
+      }
+      .note-version {
+        font-size: 0.65rem!important;
+        padding-top: 2px;
+        padding-bottom: 2px;
+      }
+    }
+    .v-list-item--active {
+      background-color: @tableBackgroundAccent!important;
+      &:before {
+        background-color: @tableBackgroundAccent!important;
+        opacity: 0!important;
+      }
+    }
+  }
+}
+
 .breadcrumbDrawer {
   z-index: 99999!important;
   .drawerContent {

@@ -185,98 +185,36 @@ public interface NoteService {
 
   void removeDraftOfNote(WikiPageParams param) throws WikiException;
 
-  /**
-   * Checks if the given user has the permission on a note
-   * 
-   * @param user the user
-   * @param note the note to check
-   * @param permissionType type of permissions to chack
-   * @return true if user has permissions on the note
-   * @throws WikiException if an error occured
-   */
-  public boolean hasPermissionOnNote(Page note, PermissionType permissionType, Identity user) throws WikiException;
 
   /**
-   * Checks if the current user has the admin permission on a space or not.
+   * Gets all the Histories of the given note
    *
-   * @param noteType It can be Portal, Group, or User.
-   * @param owner Owner of the space.
-   * @param user Identity of current user.
-   * @return The returned value is "true" if the current user has the admin
-   *         permission on the space, or "false" if not.
-   * @throws WikiException if an error occured
-   */
-  public boolean hasAdminSpacePermission(String noteType, String owner, Identity user) throws WikiException;
-
-  /**
-   * Checks if the current user has the admin permission on a note.
-   * 
-   * @param noteType It can be Portal, Group, or User.
-   * @param owner Owner of the noteBook.
-   * @param user Identity of current user.
-   * @return "True" if the current user has the admin permission on the note,
-   *         or "false" if not.
-   * @throws WikiException if an error occured
-   */
-  public boolean hasAdminNotePermission(String noteType, String owner, Identity user) throws WikiException;
-
-  /**
-   * Check if the given user can update the note
-   * 
-   * @param currentNote The note to update
-   * @param currentIdentity The identity of user user that needs to update the note
-   * @return true if the user can update the note
-   * @throws WikiException if an error occured
-   */
-  public boolean canModifyNotePermission(Page currentNote, Identity currentIdentity) throws WikiException;
-
-  /**
-   * Check if the given user can public or restrict the note
-   * 
-   * @param currentNote the note to chack permissions
-   * @param currentIdentity The identity of user
-   * @return true if the current user has EditNote permission or admin note or
-   *         admin space
-   * @throws WikiException if an error occured
-   */
-  public boolean canPublicAndRetrictNote(Page currentNote , Identity currentIdentity) throws WikiException;
-
-  /**
-   * Gets all the versions of the given note
-   * 
    * @param note The note
-   * @return All the versions of the note
+   * @param userName the author name
+   * @return All the histories of the note
    * @throws WikiException if an error occured
    */
-  public List<PageVersion> getVersionsOfNote(Page note) throws WikiException;
-
-  /**
-   * Gets a specific version by name of the given note
-   * 
-   * @param versionName The name of the version
-   * @param note The note
-   * @return The version of the note
-   * @throws WikiException if an error occured
-   */
-  public PageVersion getVersionOfNoteByName(String versionName, Page note) throws WikiException;
+  public List<PageHistory> getVersionsHistoryOfNote(Page note, String userName) throws WikiException;
 
   /**
    * Creates a version of a note. This method only tag the current note data as a
    * new version, it does not update the note data
    * 
    * @param note The note
+   * @param userName the author name
    * @throws WikiException if an error occured
    */
-  public void createVersionOfNote(Page note) throws WikiException;
+  public void createVersionOfNote(Page note, String userName) throws WikiException;
 
   /**
    * Restores a version of a note
    * 
    * @param versionName The name of the version to restore
    * @param note The note
+   * @param userName the other name
    * @throws WikiException if an error occured
    */
-  public void restoreVersionOfNote(String versionName, Page note) throws WikiException;
+  public void restoreVersionOfNote(String versionName, Page note, String userName) throws WikiException;
 
 
   /**

@@ -139,7 +139,9 @@ public interface DataStorage {
 
   public List<PageVersion> getVersionsOfPage(Page page) throws WikiException;
 
-  public void addPageVersion(Page page) throws WikiException;
+  public List<PageHistory> getHistoryOfPage(Page page) throws WikiException;
+
+  public void addPageVersion(Page page, String userName) throws WikiException;
 
   public void restoreVersionOfPage(String versionName, Page page) throws WikiException;
 

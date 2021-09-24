@@ -99,8 +99,9 @@ public class NotesRestService implements ResourceContainer {
       }
       Page note = null;
       if(noteId.equals("homeNote")){
-        note = noteBook.getWikiHome();
-      }else{
+        noteId = noteBook.getWikiHome().getId();
+        note = noteService.getNoteById(noteId, identity, source);
+      } else {
         note = noteService.getNoteOfNoteBookByName(noteBookType, noteBookOwner, noteId, identity, source);
       }
       if (note == null) {
@@ -122,7 +123,7 @@ public class NotesRestService implements ResourceContainer {
   @Path("/note/{noteId}")
   @Produces(MediaType.APPLICATION_JSON)
   @RolesAllowed("users")
-  @ApiOperation(value = "Get note by id", httpMethod = "GET", response = Response.class, notes = "This get the not if the authenticated user has permissions to view the objects linked to this note.")
+  @ApiOperation(value = "Get note by id", httpMethod = "GET", response = Response.class, notes = "This get the note if the authenticated user has permissions to view the objects linked to this note.")
   @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
       @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
       @ApiResponse(code = 404, message = "Resource not found") })
@@ -150,6 +151,31 @@ public class NotesRestService implements ResourceContainer {
       return Response.status(Response.Status.NOT_FOUND).build();
     } catch (Exception e) {
       log.error("Can't get note {}", noteId, e);
+      return Response.serverError().entity(e.getMessage()).build();
+    }
+  }
+
+  @GET
+  @Path("/versions/{noteId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("users")
+  @ApiOperation(value = "Get versions of note by id", httpMethod = "GET", response = Response.class, notes = "This get the versions of a note if the authenticated user has permissions to view the objects linked to this note.")
+  @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
+    @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+    @ApiResponse(code = 404, message = "Resource not found") })
+  public Response getNoteVersions(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId) {
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      Page note = noteService.getNoteById(noteId, identity);
+      if (note == null) {
+        return Response.status(Response.Status.NOT_FOUND).build();
+      }
+      return Response.ok(noteService.getVersionsHistoryOfNote(note, identity.getUserId())).build();
+    } catch (IllegalAccessException e) {
+      log.error("User does not have view permissions on the note {}", noteId, e);
+      return Response.status(Response.Status.UNAUTHORIZED).build();
+    } catch (Exception e) {
+      log.error("Can't get versions list of note {}", noteId, e);
       return Response.serverError().entity(e.getMessage()).build();
     }
   }
@@ -237,7 +263,7 @@ public class NotesRestService implements ResourceContainer {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
 
-      if (!noteService.hasPermissionOnNote(note_, PermissionType.EDITPAGE, identity)) {
+      if (!note_.isCanManage()) {
         return Response.status(Response.Status.FORBIDDEN).build();
       }
       note_.setToBePublished(note.isToBePublished());
@@ -255,7 +281,7 @@ public class NotesRestService implements ResourceContainer {
           note_.setName(newNoteName);
         }
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE, identity);
-        noteService.createVersionOfNote(note_);
+        noteService.createVersionOfNote(note_,identity.getUserId());
         if (!"__anonim".equals(identity.getUserId())) {
           WikiPageParams noteParams = new WikiPageParams(noteBookType, noteBookOwner, newNoteName);
           // noteService.removeDraftOfNote(noteParams);
@@ -269,7 +295,7 @@ public class NotesRestService implements ResourceContainer {
         }
         note_.setTitle(note.getTitle());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_TITLE, identity);
-        noteService.createVersionOfNote(note_);
+        noteService.createVersionOfNote(note_, identity.getUserId());
         if (!"__anonim".equals(identity.getUserId())) {
           WikiPageParams noteParams = new WikiPageParams(noteBookType, noteBookOwner, newNoteName);
           // noteService.removeDraftOfPage(noteParams);
@@ -277,7 +303,7 @@ public class NotesRestService implements ResourceContainer {
       } else if (!note_.getContent().equals(note.getContent())) {
         note_.setContent(note.getContent());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT, identity);
-        noteService.createVersionOfNote(note_);
+        noteService.createVersionOfNote(note_, identity.getUserId());
       }
       return Response.ok(note_, MediaType.APPLICATION_JSON).cacheControl(cc).build();
     } catch (IllegalAccessException e) {
@@ -312,7 +338,7 @@ public class NotesRestService implements ResourceContainer {
       if (note_ == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
-      if (!noteService.hasPermissionOnNote(note_, PermissionType.EDITPAGE, identity)) {
+      if (!note_.isCanManage()) {
         return Response.status(Response.Status.FORBIDDEN).build();
       }
       if ((!note_.getTitle().equals(note.getTitle()))
@@ -330,7 +356,7 @@ public class NotesRestService implements ResourceContainer {
           note_.setName(newNoteName);
         }
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE, identity);
-        noteService.createVersionOfNote(note_);
+        noteService.createVersionOfNote(note_, identity.getUserId());
         if (!"__anonim".equals(identity.getUserId())) {
           WikiPageParams noteParams = new WikiPageParams(note_.getWikiType(), note_.getWikiOwner(), newNoteName);
           noteService.removeDraftOfNote(noteParams);
@@ -344,7 +370,7 @@ public class NotesRestService implements ResourceContainer {
         }
         note_.setTitle(note.getTitle());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_TITLE, identity);
-        noteService.createVersionOfNote(note_);
+        noteService.createVersionOfNote(note_, identity.getUserId());
         if (!"__anonim".equals(identity.getUserId())) {
           WikiPageParams noteParams = new WikiPageParams(note_.getWikiType(), note_.getWikiOwner(), newNoteName);
           noteService.removeDraftOfNote(noteParams);
@@ -352,7 +378,7 @@ public class NotesRestService implements ResourceContainer {
       } else if (!note_.getContent().equals(note.getContent())) {
         note_.setContent(note.getContent());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT, identity);
-        noteService.createVersionOfNote(note_);
+        noteService.createVersionOfNote(note_, identity.getUserId());
       }
       return Response.ok(note_, MediaType.APPLICATION_JSON).cacheControl(cc).build();
     } catch (IllegalAccessException e) {

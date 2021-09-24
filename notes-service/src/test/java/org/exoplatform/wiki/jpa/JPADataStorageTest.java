@@ -20,6 +20,7 @@
 package org.exoplatform.wiki.jpa;
 
 import java.util.*;
+import org.mockito.Mockito;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -44,6 +45,7 @@ import org.exoplatform.wiki.utils.WikiConstants;
 public class JPADataStorageTest extends BaseWikiJPAIntegrationTest {
 
   protected JPADataStorage storage;
+  private static final String USERNAME_TEST = "test";
   
   public void setUp() throws Exception {
     super.setUp();
@@ -1106,11 +1108,11 @@ public class JPADataStorageTest extends BaseWikiJPAIntegrationTest {
     page.setTitle("Page 1");
     page.setContent("Content Page 1");
     Page createdPage = storage.createPage(wiki, wiki.getWikiHome(), page);
-
+    org.exoplatform.social.core.identity.model.Identity identity = Mockito.mock( org.exoplatform.social.core.identity.model.Identity.class);
     // When
-    storage.addPageVersion(createdPage);
+    storage.addPageVersion(createdPage, identity.getId());
     List<PageVersion> pageVersions1 = storage.getVersionsOfPage(createdPage);
-    storage.addPageVersion(createdPage);
+    storage.addPageVersion(createdPage,identity.getId());
     List<PageVersion> pageVersions2 = storage.getVersionsOfPage(createdPage);
 
     // Then
@@ -1121,6 +1123,39 @@ public class JPADataStorageTest extends BaseWikiJPAIntegrationTest {
     assertEquals(2, pageVersions2.size());
     assertEquals("2", pageVersions2.get(0).getName());
     assertEquals("1", pageVersions2.get(1).getName());
+  }
+
+  @Test
+  public void testPageVersionsHistory() throws WikiException {
+    // Given
+    Wiki wiki = new Wiki();
+    wiki.setType("portal");
+    wiki.setOwner("wiki1");
+    wiki = storage.createWiki(wiki);
+
+    Page page = new Page();
+    page.setWikiId(wiki.getId());
+    page.setWikiType(wiki.getType());
+    page.setWikiOwner(wiki.getOwner());
+    page.setName("page1");
+    page.setTitle("Page 1");
+    page.setContent("Content Page 1");
+    Page createdPage = storage.createPage(wiki, wiki.getWikiHome(), page);
+    org.exoplatform.social.core.identity.model.Identity identity = Mockito.mock( org.exoplatform.social.core.identity.model.Identity.class);
+    // When
+    storage.addPageVersion(createdPage, identity.getId());
+    List<PageHistory> pageVersions1 = storage.getHistoryOfPage(createdPage);
+    storage.addPageVersion(createdPage, identity.getId());
+    List<PageHistory> pageVersions2 = storage.getHistoryOfPage(createdPage);
+
+    // Then
+    assertNotNull(pageVersions1);
+    assertEquals(1, pageVersions1.size());
+    assertEquals("1", Long.toString(pageVersions1.get(0).getVersionNumber()));
+    assertNotNull(pageVersions2);
+    assertEquals(2, pageVersions2.size());
+    assertEquals("1", Long.toString(pageVersions2.get(0).getVersionNumber()));
+    assertEquals("2", Long.toString(pageVersions2.get(1).getVersionNumber()));
   }
 
   @Test
@@ -1139,10 +1174,12 @@ public class JPADataStorageTest extends BaseWikiJPAIntegrationTest {
     page.setTitle("Page 1");
     page.setContent("Content Page Version 1");
     Page createdPage = storage.createPage(wiki, wiki.getWikiHome(), page);
-    storage.addPageVersion(createdPage);
+    org.exoplatform.social.core.identity.model.Identity identity = Mockito.mock( org.exoplatform.social.core.identity.model.Identity.class);
+
+    storage.addPageVersion(createdPage, identity.getId());
     createdPage.setContent("Content Page Version 2");
     storage.updatePage(createdPage);
-    storage.addPageVersion(createdPage);
+    storage.addPageVersion(createdPage, identity.getId());
 
     // When
     Page pageBeforeRestore = storage.getPageById(createdPage.getId());

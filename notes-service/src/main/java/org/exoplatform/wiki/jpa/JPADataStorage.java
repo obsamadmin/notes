@@ -72,7 +72,6 @@ public class JPADataStorage implements DataStorage {
   private EmotionIconDAO emotionIconDAO;
   private FileService fileService;
   private UserACL userACL;
-  
 
   public JPADataStorage(WikiDAO wikiDAO,
                         PageDAO pageDAO,
@@ -1154,8 +1153,28 @@ public class JPADataStorage implements DataStorage {
   }
 
   @Override
+  public List<PageHistory> getHistoryOfPage(Page page) throws WikiException {
+    PageEntity pageEntity = fetchPageEntity(page);
+
+    if (pageEntity == null) {
+      throw new WikiException("Cannot get versions of page " + page.getWikiType() + ":" + page.getWikiOwner() + ":" + page.getName()
+        + " because page does not exist.");
+    }
+
+    List<PageHistory> pageVersionsHistory = new ArrayList<>();
+    List<PageVersionEntity> pageVersionEntities = pageEntity.getVersions();
+    if(pageVersionEntities != null) {
+      for (PageVersionEntity pageVersionEntity : pageVersionEntities) {
+        PageHistory pageHistory = convertPageVersionEntityToPageHistory(pageVersionEntity);
+        pageVersionsHistory.add(pageHistory);
+      }
+    }
+    return pageVersionsHistory;
+  }
+
+  @Override
   @ExoTransactional
-  public void addPageVersion(Page page) throws WikiException {
+  public void addPageVersion(Page page , String userName) throws WikiException {
     if(page != null) {
       PageEntity pageEntity = fetchPageEntity(page);
 
@@ -1177,7 +1196,11 @@ public class JPADataStorage implements DataStorage {
       pageVersionEntity.setVersionNumber(versionNumber);
       pageVersionEntity.setName(pageEntity.getName());
       pageVersionEntity.setTitle(pageEntity.getTitle());
-      pageVersionEntity.setAuthor(pageEntity.getAuthor());
+      if(StringUtils.isNotEmpty(userName)){
+        pageVersionEntity.setAuthor(userName);
+      } else{
+        pageVersionEntity.setAuthor(pageEntity.getAuthor());
+      }
       pageVersionEntity.setContent(pageEntity.getContent());
       pageVersionEntity.setSyntax(pageEntity.getSyntax());
       pageVersionEntity.setMinorEdit(pageEntity.isMinorEdit());

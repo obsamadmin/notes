@@ -12,12 +12,12 @@
               id="note-actions-menu"
               v-show="loadData && !hideActions"
               class="notes-header-icons text-right">
-              <v-tooltip bottom v-if="!isMobile">
+              <v-tooltip bottom v-if="!isMobile && note.canManage">
                 <template v-slot:activator="{ on, attrs }">
                   <v-icon
                     size="22"
                     class="clickable add-note-click"
-                    @click="addNotes"
+                    @click="addNote"
                     v-bind="attrs"
                     v-on="on">
                     mdi-plus
@@ -26,12 +26,12 @@
                 <span class="caption">{{ $t('notes.label.addPage') }}</span>
               </v-tooltip>
 
-              <v-tooltip bottom v-if="notes.canEdit && !isMobile">
+              <v-tooltip bottom v-if="note.canManage && !isMobile">
                 <template v-slot:activator="{ on, attrs }">
                   <v-icon
                     size="19"
                     class="clickable edit-note-click"
-                    @click="editNotes"
+                    @click="editNote"
                     v-bind="attrs"
                     v-on="on">
                     mdi-square-edit-outline
@@ -62,21 +62,22 @@
                   class="uiIcon uiTreeviewIcon primary--text me-3"
                   v-bind="attrs"
                   v-on="on" 
-                  @click="$refs.notesBreadcrumb.open(notes.id, 'displayNote')"></i>
+                  @click="$refs.notesBreadcrumb.open(note.id, 'displayNote')"></i>
               </template>
               <span class="caption">{{ $t('notes.label.noteTreeview.tooltip') }}</span>
             </v-tooltip>
             <note-breadcrumb :note-breadcrumb="notebreadcrumb" @open-note="getNoteByName($event, 'breadCrumb')" />
           </div>
           <div class="notes-last-update-info">
+            <span class="note-version border-radius primary px-2 font-weight-bold me-2 caption clickable" @click="$refs.noteVersionsHistoryDrawer.open(noteVersions)">V{{ lastNoteVersion }}</span>
             <span class="caption text-sub-title font-italic">{{ $t('notes.label.LastModifiedBy', {0: lastNotesUpdatebBy, 1: displayedDate}) }}</span>
           </div>
         </div>
         <v-divider class="my-4" />
         <div
-          v-if="notes.content"
+          v-if="note.content"
           class="notes-application-content text-color"
-          v-html="notes.content">
+          v-html="noteVersionContent">
         </div>
         <div v-else class="notes-application-content">
           <p class="body-2 font-italic">
@@ -101,11 +102,16 @@
       </div>
     </div>
     <notes-actions-menu
-      :note="notes" 
+      :note="note"
       :default-path="defaultPath" 
-      @open-treeview="$refs.notesBreadcrumb.open(notes.id, 'movePage')" 
-      @export-pdf="createPDF(notes)" />
-    <note-treeview-drawer ref="notesBreadcrumb" />
+      @open-treeview="$refs.notesBreadcrumb.open(note.id, 'movePage')"
+      @export-pdf="createPDF(note)"
+      @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)" />
+    <note-treeview-drawer
+      ref="notesBreadcrumb" />
+    <note-history-drawer
+      ref="noteVersionsHistoryDrawer"
+      @open-version="displayVersion($event)" />
     <exo-confirm-dialog
       ref="DeleteNoteDialog"
       :message="confirmMessage"
@@ -113,7 +119,7 @@
       :ok-label="$t('notes.button.ok')"
       :cancel-label="$t('notes.button.cancel')"
       persistent
-      @ok="deleteNotes()"
+      @ok="deleteNote()"
       @dialog-opened="$emit('confirmDialogOpened')"
       @dialog-closed="$emit('confirmDialogClosed')" />
     <v-alert
@@ -133,8 +139,7 @@ import JSPDF from 'jspdf';
 export default {
   data() {
     return {
-      notes: {},
-      lastUpdatedUser: '',
+      note: {},
       lastUpdatedTime: '',
       lang: eXo.env.portal.language,
       dateTimeFormat: {
@@ -144,12 +149,9 @@ export default {
         hour: '2-digit',
         minute: '2-digit',
       },
-      displayActionMenu: false,
-      parentPageName: '',
       confirmMessage: '',
       noteBookType: eXo.env.portal.spaceName ? 'group' : 'user',
       noteBookOwner: eXo.env.portal.spaceGroup ? `/spaces/${eXo.env.portal.spaceGroup}` : eXo.env.portal.profileOwner,
-      noteBookOwnerTree: eXo.env.portal.spaceGroup ? `spaces/${eXo.env.portal.spaceGroup}` : eXo.env.portal.profileOwner,
       noteNotFountImage: '/notes/skin/images/notes_not_found.png',
       defaultPath: 'Home',
       existingNote: true,
@@ -161,24 +163,51 @@ export default {
       loadData: false,
       openTreeView: false,
       hideActions: false,
+      noteVersions: [],
+      actualVersion: {},
+      noteContent: '',
+      displayLastVersion: true
     };
   },
   watch: {
-    notes() {
-      this.lastUpdatedUser = this.retrieveUserInformations(this.notes.author);
-      if ( this.notes && this.notes.breadcrumb && this.notes.breadcrumb.length ) {
-        this.notes.breadcrumb[0].title = this.$t('notes.label.noteHome');
-        this.currentNoteBreadcrumb = this.notes.breadcrumb;
+    note() {
+
+      this.getNoteVersionByNoteId(this.note.id);
+      if ( this.note && this.note.breadcrumb && this.note.breadcrumb.length ) {
+        this.note.breadcrumb[0].title = this.$t('note.label.noteHome');
+        this.currentNoteBreadcrumb = this.note.breadcrumb;
       }
-      this.lastUpdatedTime = this.notes.updatedDate.time && this.$dateUtil.formatDateObjectToDisplay(new Date(this.notes.updatedDate.time), this.dateTimeFormat, this.lang) || '';
+      this.noteContent = this.note.content;
+    },
+    actualVersion() {
+      this.noteContent = this.actualVersion.content;
+      this.displayLastVersion = false;
     }
   },
   computed: {
+    noteVersionContent() {
+      return this.noteContent;
+    },
+    lastNoteVersion() {
+      if ( this.displayLastVersion ) {
+        return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].versionNumber;
+      } else {
+        return this.actualVersion.versionNumber;
+      }
+    },
     lastNotesUpdatebBy() {
-      return this.lastUpdatedUser;
+      if ( this.displayLastVersion ) {
+        return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].authorFullName;
+      } else {
+        return this.actualVersion.authorFullName;
+      }
     },
     displayedDate() {
-      return this.lastUpdatedTime;
+      if ( this.displayLastVersion ) {
+        return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].updatedDate.time && this.$dateUtil.formatDateObjectToDisplay(new Date(this.noteVersions[0].updatedDate.time), this.dateTimeFormat, this.lang) || '';
+      } else {
+        return this.$dateUtil.formatDateObjectToDisplay(new Date(this.actualVersion.updatedDate.time), this.dateTimeFormat, this.lang) || '';
+      }
     },
     isMobile() {
       return this.$vuetify.breakpoint.name === 'xs';
@@ -194,7 +223,7 @@ export default {
       if ( this.noteId === 1) {
         return this.$t('notes.label.noteHome');
       } else {
-        return this.notes.title;
+        return this.note.title;
       }
     },
     notesPageName() {
@@ -245,27 +274,27 @@ export default {
   },
   mounted() {
     if (this.noteId){
-      this.getNotesById(this.noteId);
+      this.getNoteById(this.noteId);
     } else {
       this.getNoteByName(this.notesPageName);
     }
-    this.currentNoteBreadcrumb = this.notes.breadcrumb;
+    this.currentNoteBreadcrumb = this.note.breadcrumb;
   },
   methods: {
-    addNotes(){
-      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?spaceId=${eXo.env.portal.spaceId}&parentNoteId=${this.notes.id}&appName=${this.appName}`,'_blank');
+    addNote(){
+      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?spaceId=${eXo.env.portal.spaceId}&parentNoteId=${this.note.id}&appName=${this.appName}`,'_blank');
     },
-    editNotes(){
-      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.notes.id}&appName=${this.appName}`,'_blank');
+    editNote(){
+      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.note.id}&appName=${this.appName}`,'_blank');
     },
-    deleteNotes(){
-      this.$notesService.deleteNotes(this.notes).then(() => {
+    deleteNote(){
+      this.$notesService.deleteNotes(this.note).then(() => {
         this.getNoteByName(this.notebreadcrumb[ this.notebreadcrumb.length-2].id);
       }).catch(e => {
-        console.error('Error when deleting notes', e);
+        console.error('Error when deleting note', e);
       });
     },
-    moveNotes(note, newParentNote){
+    moveNote(note, newParentNote){
       note.parentPageId=newParentNote.id;
       this.$notesService.moveNotes(note, newParentNote).then(() => {
         this.getNoteByName(note.name);
@@ -279,12 +308,7 @@ export default {
         });
       });
     },
-    retrieveUserInformations(userName) {
-      this.$userService.getUser(userName).then(user => {
-        this.lastUpdatedUser =  user.fullname;
-      });
-    },
-    getNotesById(noteId,source) {
+    getNoteById(noteId,source) {
       return this.$notesService.getNoteById(noteId,source,this.noteBookType, this.noteBookOwner).then(data => {
         const note = data || [];
         this.getNoteByName(note.name, source);
@@ -293,14 +317,14 @@ export default {
         this.existingNote = false;
       }).finally(() => {
         this.$root.$applicationLoaded();
-        this.$root.$emit('refresh-treeview-items',this.notes.id);
+        this.$root.$emit('refresh-treeview-items',this.note.id);
       });
     },
     getNoteByName(noteName,source) {
       return this.$notesService.getNotes(this.noteBookType, this.noteBookOwner, noteName,source).then(data => {
-        this.notes = data || [];
+        this.note = data || [];
         this.loadData = true;
-        notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.split(this.appName)[0]}${this.appName}/${this.notes.id}`;
+        notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.split(this.appName)[0]}${this.appName}/${this.note.id}`;
         window.history.pushState('notes', '', notesConstants.PORTAL_BASE_URL);
         return this.$nextTick();
       }).catch(e => {
@@ -308,7 +332,7 @@ export default {
         this.existingNote = false;
       }).finally(() => {
         this.$root.$applicationLoaded();
-        this.$root.$emit('refresh-treeview-items',this.notes.id);
+        this.$root.$emit('refresh-treeview-items',this.note.id);
       });
     },
     confirmDeleteNote: function () {
@@ -320,7 +344,7 @@ export default {
         }
       }
       this.confirmMessage = `${this.$t('popup.msg.confirmation.DeleteInfo1', {
-        0: `<b>${this.notes && this.notes.title}</b>`,
+        0: `<b>${this.note && this.note.title}</b>`,
       })
       }`
           + `<p>${this.$t('popup.msg.confirmation.DeleteInfo2')}</p>`
@@ -374,6 +398,14 @@ export default {
       this.type=message.type;
       this.alert = true;
       window.setTimeout(() => this.alert = false, 5000);
+    },
+    getNoteVersionByNoteId(noteId) {
+      return this.$notesService.getNoteVersionsByNoteId(noteId).then(data => {
+        this.noteVersions = data && data.reverse() || [];
+      });
+    },
+    displayVersion(version) {
+      this.actualVersion = version;
     }
   }
 };
