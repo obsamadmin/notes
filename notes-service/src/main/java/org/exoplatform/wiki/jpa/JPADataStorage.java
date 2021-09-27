@@ -19,14 +19,7 @@
 
 package org.exoplatform.wiki.jpa;
 
-import static org.exoplatform.wiki.jpa.EntityConverter.*;
-
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.*;
-
 import org.apache.commons.lang.StringUtils;
-
 import org.exoplatform.commons.api.persistence.DataInitializer;
 import org.exoplatform.commons.api.persistence.ExoTransactional;
 import org.exoplatform.commons.file.services.FileService;
@@ -36,7 +29,9 @@ import org.exoplatform.container.ExoContainerContext;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
 import org.exoplatform.container.xml.ValuesParam;
-import org.exoplatform.portal.config.*;
+import org.exoplatform.portal.config.UserACL;
+import org.exoplatform.portal.config.UserPortalConfig;
+import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.PortalConfig;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
@@ -49,7 +44,15 @@ import org.exoplatform.wiki.service.DataStorage;
 import org.exoplatform.wiki.service.IDType;
 import org.exoplatform.wiki.service.WikiPageParams;
 import org.exoplatform.wiki.service.search.*;
-import org.exoplatform.wiki.utils.*;
+import org.exoplatform.wiki.utils.Utils;
+import org.exoplatform.wiki.utils.VersionNameComparatorDesc;
+import org.exoplatform.wiki.utils.WikiConstants;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.*;
+
+import static org.exoplatform.wiki.jpa.EntityConverter.*;
 
 /**
  * Created by The eXo Platform SAS Author : eXoPlatform exo@exoplatform.com
@@ -72,6 +75,7 @@ public class JPADataStorage implements DataStorage {
   private EmotionIconDAO emotionIconDAO;
   private FileService fileService;
   private UserACL userACL;
+  
 
   public JPADataStorage(WikiDAO wikiDAO,
                         PageDAO pageDAO,
@@ -725,10 +729,19 @@ public class JPADataStorage implements DataStorage {
   }
 
   @Override
-  public void createDraftPageForUser(DraftPage draftPage, String username) throws WikiException {
+  public DraftPage createDraftPageForUser(DraftPage draftPage, String username) throws WikiException {
     DraftPageEntity draftPageEntity = convertDraftPageToDraftPageEntity(draftPage, pageDAO);
     draftPageEntity.setAuthor(username);
-    draftPageDAO.create(draftPageEntity);
+    draftPage = convertDraftPageEntityToDraftPage(draftPageDAO.create(draftPageEntity));
+    return draftPage;
+  }
+
+  @Override
+  public DraftPage updateDraftPageForUser(DraftPage draftPage, String username) throws WikiException {
+    DraftPageEntity draftPageEntity = convertDraftPageToDraftPageEntity(draftPage, pageDAO);
+    draftPageEntity.setAuthor(username);
+    draftPage = convertDraftPageEntityToDraftPage(draftPageDAO.update(draftPageEntity));
+    return draftPage;
   }
 
   @Override
@@ -784,7 +797,7 @@ public class JPADataStorage implements DataStorage {
     String wikiType;
     String wikiOwner;
     String pageName;
-    if (page instanceof DraftPage) {
+    if (page.isDraftPage()) {
       DraftPageEntity draftPageEntity = draftPageDAO.findLatestDraftPageByUserAndName(page.getAuthor(), page.getName());
       if (draftPageEntity == null) {
         throw new WikiException("Cannot get attachments of draft page " + page.getWikiType() + ":" + page.getWikiOwner() + ":"
@@ -848,7 +861,7 @@ public class JPADataStorage implements DataStorage {
   @ExoTransactional
   public void addAttachmentToPage(Attachment attachment, Page page) throws WikiException {
 
-    if(page instanceof DraftPage) {
+    if(page.isDraftPage()) {
 
       DraftPageAttachmentEntity attachmentEntity = convertAttachmentToDraftPageAttachmentEntity(fileService, attachment);
       Date now = GregorianCalendar.getInstance().getTime();
@@ -1199,7 +1212,7 @@ public class JPADataStorage implements DataStorage {
       if(StringUtils.isNotEmpty(userName)){
         pageVersionEntity.setAuthor(userName);
       } else{
-        pageVersionEntity.setAuthor(pageEntity.getAuthor());
+      pageVersionEntity.setAuthor(pageEntity.getAuthor());
       }
       pageVersionEntity.setContent(pageEntity.getContent());
       pageVersionEntity.setSyntax(pageEntity.getSyntax());
@@ -1253,7 +1266,7 @@ public class JPADataStorage implements DataStorage {
   @Override
   @ExoTransactional
   public void updatePage(Page page) throws WikiException {
-    if(page instanceof DraftPage) {
+    if(page.isDraftPage()) {
       DraftPageEntity draftPageEntity = draftPageDAO.findLatestDraftPageByUserAndName(page.getAuthor(), page.getName());
 
       if (draftPageEntity == null) {

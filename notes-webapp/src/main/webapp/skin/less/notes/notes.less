@@ -137,6 +137,13 @@
   				}
   				.notesFormRightActions{
             position: relative;
+            display: inline-flex;
+
+            .draftSavingStatus {
+              font-style: italic;
+              align-self: self-end;
+            }
+            
   					#notesUpdateAndPost,.notesCancel{
   						height: 36px;
   						min-width: 64px;
@@ -401,7 +408,9 @@
 /***** WikiLayout *******/
 .wikiBox {
 	h6.titleWikiBox {
-		a {color: @textColor;}
+    a {
+      color: @textColor;
+    }
 	}
 }
 
@@ -957,7 +966,8 @@
 	}
     .uiWikiPageControlArea {
         .uiPageToolBar {
-            float: none; margin: 0;
+      float: none;
+      margin: 0;
         }
         .uiWikiPageTitle {
             clear: both;

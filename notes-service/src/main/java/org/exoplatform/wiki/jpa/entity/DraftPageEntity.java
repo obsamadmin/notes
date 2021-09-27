@@ -84,6 +84,10 @@ public class DraftPageEntity extends BasePageEntity {
     return id;
   }
 
+  public void setId(long id) {
+    this.id = id;
+  }
+
   public List<DraftPageAttachmentEntity> getAttachments() {
     return attachments;
   }
