@@ -21,6 +21,9 @@
       <template v-else-if="movePage" slot="title">
         {{ $t('notes.label.movePageTitle') }}
       </template>
+      <template v-else-if="exportNotes" slot="title">
+        {{ $t('notes.label.exportNotesTitle') }}
+      </template>
       <template v-else slot="title">
         {{ $t('notes.label.breadcrumbTitle') }}
       </template>
@@ -63,7 +66,7 @@
           </v-list-item>
         </v-layout>
         <v-layout column>
-          <template v-if="home" class="ma-0 border-box-sizing">
+          <template v-if="home && !exportNotes" class="ma-0 border-box-sizing">
             <v-list-item @click="openNote(event,home)">
               <v-list-item-content>
                 <v-list-item-title class="body-2 treeview-home-link">
@@ -72,7 +75,21 @@
               </v-list-item-content>
             </v-list-item>
           </template>
-          <template v-if="items && items.length">
+          <template v-if="items && items.length && exportNotes">
+            <v-treeview
+              v-if="reload"
+              v-model="selectionNotes"
+              :items="items"
+              :active="active"
+              :load-children="fetchNoteChildren"
+              class="treeview-item"
+              item-key="id"
+              hoverable
+              selectable
+              open-all
+              transition />
+          </template>
+          <template v-if="items && items.length && !exportNotes">
             <v-treeview
               v-if="reload"
               :items="items[0].children"
@@ -108,6 +125,21 @@
           </v-btn>
         </div>
       </template>
+      <template v-if="exportNotes" slot="footer">
+        <div class="d-flex">
+          <v-spacer />
+          <v-btn
+            @click="close"
+            class="btn ml-2">
+            {{ $t('notes.button.cancel') }}
+          </v-btn>
+          <v-btn
+            @click="exportNotesToZip()"
+            class="btn btn-primary ml-2">
+            {{ $t('notes.button.export') }}
+          </v-btn>
+        </div>
+      </template>
     </exo-drawer>
   </div>
 </template>
@@ -124,6 +156,8 @@ export default {
     activeItem: [],
     isIncludePage: false,
     movePage: false,
+    exportNotes: false,
+    selectionNotes: [],
     spaceDisplayName: eXo.env.portal.spaceDisplayName,
     breadcrumb: [],
     destinationNote: {},
@@ -182,8 +216,14 @@ export default {
       }
       if (source === 'movePage') {
         this.movePage = true;
+        this.exportNotes = false;
+      }
+      else if (source === 'exportNotes') {
+        this.exportNotes = true;
+        this.movePage = false;
       } else {
         this.movePage = false;
+        this.exportNotes = false;
       }
       this.$nextTick().then(() => {
         this.$forceUpdate();
@@ -306,6 +346,10 @@ export default {
     },
     moveNote(){
       this.$root.$emit('move-page',this.note,this.destinationNote);
+    },
+    exportNotesToZip(){
+      this.$root.$emit('exportNotes',this.selectionNotes);
+      this.close();
     },
     close(){
       this.render = false;
