@@ -115,12 +115,16 @@
       @export-pdf="createPDF(note)"
       @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)"
       @open-treeview-export="$refs.notesBreadcrumb.open(note.id, 'exportNotes')" />
+      @open-import-drawer="$refs.noteImportDrawer.open()" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />
     <note-history-drawer
       ref="noteVersionsHistoryDrawer"
       @open-version="displayVersion($event)"
       @restore-version="restoreVersion($event)" />
+      @open-version="displayVersion($event)" />
+    <note-import-drawer
+      ref="noteImportDrawer" />
     <exo-confirm-dialog
       ref="DeleteNoteDialog"
       :message="confirmMessage"

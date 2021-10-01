@@ -60,5 +60,10 @@
     "webpack": "^4.25.0",
     "webpack-cli": "^3.1.2",
     "webpack-merge": "^4.1.4"
+  },
+  "dependencies": {
+    "axios": "^0.21.4",
+    "jszip": "^3.7.1",
+    "vue-axios": "^3.3.7"
   }
 }
