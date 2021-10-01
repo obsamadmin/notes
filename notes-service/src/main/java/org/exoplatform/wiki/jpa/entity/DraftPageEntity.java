@@ -34,7 +34,7 @@ import java.util.List;
         @NamedQuery(name = "wikiDraftPage.findDraftPagesByUser", query = "SELECT d FROM WikiDraftPageEntity d WHERE d.author = :username ORDER BY d.updatedDate DESC"),
         @NamedQuery(name = "wikiDraftPage.findDraftPageByUserAndName", query = "SELECT d FROM WikiDraftPageEntity d WHERE d.author = :username AND d.name = :draftPageName ORDER BY d.updatedDate DESC"),
         @NamedQuery(name = "wikiDraftPage.findDraftPageByUserAndTargetPage", query = "SELECT d FROM WikiDraftPageEntity d WHERE d.author = :username AND d.targetPage.id = :targetPageId"),
-        @NamedQuery(name = "wikiDraftPage.findRootDraftPageByUser", query = "SELECT d FROM WikiDraftPageEntity d WHERE d.author = :username AND d.targetPage.id is null ")
+        @NamedQuery(name = "wikiDraftPage.findDraftPagesByUserAndParentPage", query = "SELECT d FROM WikiDraftPageEntity d WHERE d.author = :username AND d.parentPage.id = :parentPageId")
 })
 public class DraftPageEntity extends BasePageEntity {
 
@@ -47,6 +47,10 @@ public class DraftPageEntity extends BasePageEntity {
   @ManyToOne
   @JoinColumn(name = "TARGET_PAGE_ID")
   private PageEntity targetPage;
+
+  @ManyToOne
+  @JoinColumn(name = "PARENT_PAGE_ID")
+  private PageEntity parentPage;
 
   @Column(name = "TARGET_PAGE_REVISION")
   private String targetRevision;
@@ -63,6 +67,14 @@ public class DraftPageEntity extends BasePageEntity {
 
   public void setTargetPage(PageEntity targetPage) {
     this.targetPage = targetPage;
+  }
+
+  public PageEntity getParentPage() {
+    return parentPage;
+  }
+
+  public void setParentPage(PageEntity parentPage) {
+    this.parentPage = parentPage;
   }
 
   public String getTargetRevision() {
