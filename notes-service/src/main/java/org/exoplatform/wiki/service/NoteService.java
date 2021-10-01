@@ -16,12 +16,12 @@
  */
 package org.exoplatform.wiki.service;
 
+import java.io.File;
+import java.util.List;
+
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.wiki.WikiException;
-import org.exoplatform.wiki.mow.api.DraftPage;
-import org.exoplatform.wiki.mow.api.Page;
-import org.exoplatform.wiki.mow.api.PageHistory;
-import org.exoplatform.wiki.mow.api.Wiki;
+import org.exoplatform.wiki.mow.api.*;
 import org.gatein.api.EntityNotFoundException;
 
 import java.util.List;
@@ -266,7 +266,7 @@ public interface NoteService {
    * @param noteOwner the notebook owner
    * @return List of pages
    */
-  public List<Page> getNotesOfWiki(String noteType, String noteOwner);
+  List<Page> getNotesOfWiki(String noteType, String noteOwner);
 
   boolean isExisting(String noteBookType, String noteBookOwner, String noteId) throws WikiException;
 
@@ -274,20 +274,20 @@ public interface NoteService {
 
   /**
    * Update draft note for an existing page
-   * 
+   *
    * @param draftNoteToUpdate The draft note to be updated
-   * @param targetNote The target note of the draft 
+   * @param targetNote The target note of the draft
    * @param revision The revision which is used for creating the draft page. If "null", this will be the last revision.
-   * @param currentTimeMillis 
+   * @param currentTimeMillis
    * @param userName The author name
-   * @return Updated draft 
+   * @return Updated draft
    * @throws WikiException
    */
   DraftPage updateDraftForExistPage(DraftPage draftNoteToUpdate, Page targetNote, String revision, long currentTimeMillis, String userName) throws WikiException;
 
   /**
    * Update draft note for a new page
-   * 
+   *
    * @param draftNoteToUpdate the draft note to be updated
    * @param currentTimeMillis
    * @return Updated draft
@@ -297,7 +297,7 @@ public interface NoteService {
 
   /**
    * Creates a draft for an existing page
-   * 
+   *
    * @param draftNoteToSave The draft note to be created
    * @param targetNote The target note of the draft
    * @param revision The revision which is used for creating the draft page. If "null", this will be the last revision.
@@ -310,11 +310,25 @@ public interface NoteService {
 
   /**
    * Creates a draft for a new page
-   * 
+   *
    * @param draftNoteToSave The draft note to be created
    * @param currentTimeMillis
    * @return Created draft
    * @throws WikiException
    */
   DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
+
+  NoteToExport getNoteToExport(NoteToExport note) throws WikiException;
+
+  List<File>  getFilesfromContent(NoteToExport note, List<File> files) throws WikiException;
+
+  String processImagesForExport(String content) throws WikiException;
+
+  void importNote(Page note, Page parent, Wiki wiki, String conflict) throws WikiException;
+
+  List<NoteToExport> getChildrenNoteOf(NoteToExport note) throws WikiException;
+
+  NoteToExport getParentNoteOf(NoteToExport note) throws WikiException;
+
+
 }

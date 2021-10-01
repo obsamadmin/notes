@@ -270,6 +270,9 @@ export default {
     this.$root.$on('move-page', (note, newParentNote) => {
       this.moveNotes(note, newParentNote);
     });
+    this.$root.$on('export-notes', (notes) => {
+      this.exportNotes(notes);
+    });
     
   },
   mounted() {
@@ -306,6 +309,24 @@ export default {
           type: 'error',
           message: this.$t(`notes.message.${e.message}`)
         });
+      });
+    },
+    exportNotes(notes){
+      this.$notesService.exportNotes(notes).then((transfer) => {
+        return transfer.blob();                 
+      }).then((bytes) => {
+        const elm = document.createElement('a');  
+        elm.href = URL.createObjectURL(bytes);  
+        elm.setAttribute('download', `NotesExport_${Date.now()}`); 
+        elm.click();                             
+        this.$root.$emit('close-note-tree-drawer');
+        this.$root.$emit('show-alert', {type: 'success',message: this.$t('notes.alert.success.label.exported')});
+      }).catch(e=> {
+        console.error('Error when export note page', e);
+        this.$root.$emit('show-alert', {
+          type: 'error',
+          message: this.$t(`notes.message.${e.message}`)
+        });          
       });
     },
     getNoteById(noteId,source) {

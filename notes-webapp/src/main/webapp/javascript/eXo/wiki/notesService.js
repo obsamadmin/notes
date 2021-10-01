@@ -163,7 +163,7 @@ export function deleteNotes(note) {
     if (resp && resp.ok) {
       return resp;
     } else {
-      throw new Error('Error when deleting notes from label');
+      throw new Error('Error when deleting notes');
     }
   });
 }
@@ -176,7 +176,7 @@ export function deleteDraftNote(note) {
     if (resp && resp.ok) {
       return resp;
     } else {
-      throw new Error('Error when deleting notes from label');
+      throw new Error('Error when deleting draft');
     }
   });
 }
@@ -189,7 +189,21 @@ export function moveNotes(note,destination) {
     if (resp && resp.ok) {
       return resp;
     } else {
-      throw new Error('Error when deleting notes from label');
+      throw new Error('Error when moving notes');
+    }
+  });
+}
+
+
+export function exportNotes(notes) {
+  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/export/${notes}?exportChildren=false`, {
+    credentials: 'include',
+    method: 'GET',
+  }).then((resp) => {
+    if (resp && resp.ok) {
+      return resp;
+    } else { 
+      throw new Error('Error when exporting notes');
     }
   });
 }

@@ -83,7 +83,7 @@
               :active="active"
               :load-children="fetchNoteChildren"
               class="treeview-item"
-              item-key="id"
+              item-key="noteId"
               hoverable
               selectable
               open-all
@@ -348,7 +348,7 @@ export default {
       this.$root.$emit('move-page',this.note,this.destinationNote);
     },
     exportNotesToZip(){
-      this.$root.$emit('exportNotes',this.selectionNotes);
+      this.$root.$emit('export-notes',this.selectionNotes);
       this.close();
     },
     close(){

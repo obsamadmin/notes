@@ -18,9 +18,29 @@ package org.exoplatform.wiki.service.rest;
 
 import io.swagger.annotations.*;
 import io.swagger.jaxrs.PATCH;
+import java.io.*;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
+
+import javax.annotation.security.RolesAllowed;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.*;
+import javax.ws.rs.core.CacheControl;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.BooleanUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.common.http.HTTPStatus;
 import org.exoplatform.commons.utils.HTMLSanitizer;
 import org.exoplatform.services.log.ExoLogger;
@@ -30,7 +50,7 @@ import org.exoplatform.services.rest.impl.EnvironmentContext;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
-import org.exoplatform.wiki.mow.api.DraftPage;
+import org.exoplatform.wiki.mow.api.NoteToExport;
 import org.exoplatform.wiki.mow.api.Page;
 import org.exoplatform.wiki.mow.api.Wiki;
 import org.exoplatform.wiki.resolver.TitleResolver;
@@ -45,15 +65,10 @@ import org.exoplatform.wiki.tree.TreeNode.TREETYPE;
 import org.exoplatform.wiki.tree.WikiTreeNode;
 import org.exoplatform.wiki.tree.utils.TreeUtils;
 import org.exoplatform.wiki.utils.Utils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import javax.annotation.security.RolesAllowed;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.*;
-import javax.ws.rs.core.CacheControl;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.net.URLDecoder;
-import java.util.*;
+import io.swagger.annotations.*;
+import io.swagger.jaxrs.PATCH;
 
 @Path("/notes")
 @Api(value = "/notes", description = "Managing notes")
@@ -62,11 +77,16 @@ import java.util.*;
 public class NotesRestService implements ResourceContainer {
 
   private static final String         NOTE_NAME_EXISTS = "Note name already exists";
-  private static Log                  log = ExoLogger.getLogger(NotesRestService.class);
+  private static final Log                  log = ExoLogger.getLogger(NotesRestService.class);
   private final NoteService           noteService;
   private final WikiService           noteBookService;
   private final ResourceBundleService resourceBundleService;
   private final CacheControl          cc;
+  private static final String          IMAGE_URL_REPLACEMENT_PREFIX = "//-";
+  private static final String          IMAGE_URL_REPLACEMENT_SUFFIX = "-//";
+  private static final String          EXPORT_ZIP_NAME = "ziped.zip";
+
+
 
   public NotesRestService(NoteService noteService, WikiService noteBookService, ResourceBundleService resourceBundleService) {
     this.noteService = noteService;
@@ -75,6 +95,38 @@ public class NotesRestService implements ResourceContainer {
     cc = new CacheControl();
     cc.setNoCache(true);
     cc.setNoStore(true);
+  }
+
+  public static File zipFiles(String zipFileName, List<File> addToZip)
+          throws IOException {
+
+    String zipPath = System.getProperty("java.io.tmpdir")
+            + File.separator + zipFileName;
+    new File(zipPath).delete();
+
+    try (FileOutputStream fos = new FileOutputStream(zipPath);
+         ZipOutputStream zos = new ZipOutputStream(
+                 new BufferedOutputStream(fos))) {
+      zos.setLevel(9);
+
+      for (File file : addToZip) {
+        if (file.exists()) {
+          try (FileInputStream fis = new FileInputStream(file)) {
+            ZipEntry entry = new ZipEntry(file.getName());
+            zos.putNextEntry(entry);
+            for (int c = fis.read(); c != -1; c = fis.read()) {
+              zos.write(c);
+            }
+            zos.flush();
+          }
+        }
+      }
+    }
+    File zip = new File(zipPath);
+    if (!zip.exists()) {
+      throw new FileNotFoundException("The created zip file could not be found");
+    }
+    return zip;
   }
 
   @GET
@@ -237,78 +289,6 @@ public class NotesRestService implements ResourceContainer {
     }
   }
 
-  @POST
-  @Path("saveDraft")
-  @RolesAllowed("users")
-  @ApiOperation(value = "Add or update a new note draft page", httpMethod = "POST", response = Response.class, notes = "This adds a new note draft page or updates an existing one.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Request fulfilled"),
-          @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
-          @ApiResponse(code = 404, message = "Resource not found")})
-  public Response saveDraft(@ApiParam(value = "Note draft page object to be created", required = true) DraftPage draftNoteToSave) {
-    if (draftNoteToSave == null) {
-      return Response.status(Response.Status.BAD_REQUEST).build();
-    }
-    if (NumberUtils.isNumber(draftNoteToSave.getTitle())) {
-      log.warn("Draft Note's title should not be number");
-      return Response.status(Response.Status.BAD_REQUEST).entity("{ message: Draft Note's title should not be number}").build();
-    }
-
-    String noteBookType = draftNoteToSave.getWikiType();
-    String noteBookOwner = draftNoteToSave.getWikiOwner();
-    Page parentNote;
-    Page targetNote = null;
-    try {
-      Identity identity = ConversationState.getCurrent().getIdentity();
-      if (StringUtils.isNoneEmpty(draftNoteToSave.getParentPageId())) {
-        parentNote = noteService.getNoteById(draftNoteToSave.getParentPageId(), identity);
-        if (parentNote != null) {
-          noteBookType = parentNote.getWikiType();
-          noteBookOwner = parentNote.getWikiOwner();
-          draftNoteToSave.setParentPageName(parentNote.getName());
-        } else {
-          return Response.status(Response.Status.BAD_REQUEST).build();
-        }
-      }
-      if (StringUtils.isEmpty(noteBookType) || StringUtils.isEmpty(noteBookOwner)) {
-        return Response.status(Response.Status.BAD_REQUEST).build();
-      }
-      Wiki noteBook = noteBookService.getWikiByTypeAndOwner(noteBookType, noteBookOwner);
-      if (noteBook == null) {
-        return Response.status(Response.Status.BAD_REQUEST).build();
-      }
-      if (StringUtils.isNoneEmpty(draftNoteToSave.getTargetPageId())) {
-        targetNote = noteService.getNoteById(draftNoteToSave.getTargetPageId());
-        if (targetNote == null) {
-          return Response.status(Response.Status.BAD_REQUEST).build();
-        }
-      }
-
-      String syntaxId = noteBookService.getDefaultWikiSyntaxId();
-      String currentUser = identity.getUserId();
-      draftNoteToSave.setAuthor(currentUser);
-      draftNoteToSave.setSyntax(syntaxId);
-
-      if (!draftNoteToSave.isNewPage()) {
-        if (targetNote != null) {
-          draftNoteToSave = noteService.updateDraftForExistPage(draftNoteToSave, targetNote, null, System.currentTimeMillis(), currentUser);
-        } else {
-          draftNoteToSave = noteService.updateDraftForNewPage(draftNoteToSave, System.currentTimeMillis());
-        }
-      } else {
-        if (targetNote != null) {
-          draftNoteToSave = noteService.createDraftForExistPage(draftNoteToSave, targetNote, null, System.currentTimeMillis(), currentUser);
-        } else {
-          draftNoteToSave = noteService.createDraftForNewPage(draftNoteToSave, System.currentTimeMillis());
-        }
-      }
-
-      return Response.ok(draftNoteToSave, MediaType.APPLICATION_JSON).cacheControl(cc).build();
-    } catch (Exception ex) {
-      log.warn("Failed to perform save noteBook draft note {}:{}:{}", noteBookType, noteBookOwner, draftNoteToSave.getId(), ex);
-      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
-    }
-  }
-
   @PUT
   @Path("/note/{noteBookType}/{noteBookOwner:.+}/{noteId}")
   @RolesAllowed("users")
@@ -405,7 +385,6 @@ public class NotesRestService implements ResourceContainer {
     }
     try {
       Identity identity = ConversationState.getCurrent().getIdentity();
-      String currentUser = identity.getUserId();
       Page note_ = noteService.getNoteById(noteId, identity);
       if (note_ == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
@@ -418,8 +397,8 @@ public class NotesRestService implements ResourceContainer {
         return Response.status(Response.Status.CONFLICT).entity(NOTE_NAME_EXISTS).build();
       }
       note_.setToBePublished(note.isToBePublished());
-      String newNoteName = TitleResolver.getId(note.getTitle(), false);
       if (!note_.getTitle().equals(note.getTitle()) && !note_.getContent().equals(note.getContent())) {
+        String newNoteName = TitleResolver.getId(note.getTitle(), false);
         note_.setTitle(note.getTitle());
         note_.setContent(note.getContent());
         if (!org.exoplatform.wiki.utils.WikiConstants.WIKI_HOME_NAME.equals(note.getName())
@@ -428,8 +407,13 @@ public class NotesRestService implements ResourceContainer {
           note_.setName(newNoteName);
         }
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE, identity);
-        noteService.createVersionOfNote(note_, currentUser);
+        noteService.createVersionOfNote(note_, identity.getUserId());
+        if (!"__anonim".equals(identity.getUserId())) {
+          WikiPageParams noteParams = new WikiPageParams(note_.getWikiType(), note_.getWikiOwner(), newNoteName);
+          noteService.removeDraftOfNote(noteParams);
+        }
       } else if (!note_.getTitle().equals(note.getTitle())) {
+        String newNoteName = TitleResolver.getId(note.getTitle(), false);
         if (!org.exoplatform.wiki.utils.WikiConstants.WIKI_HOME_NAME.equals(note.getName())
             && !note.getName().equals(newNoteName)) {
           noteService.renameNote(note_.getWikiType(), note_.getWikiOwner(), note_.getName(), newNoteName, note.getTitle());
@@ -437,15 +421,15 @@ public class NotesRestService implements ResourceContainer {
         }
         note_.setTitle(note.getTitle());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_TITLE, identity);
-        noteService.createVersionOfNote(note_, currentUser);
+        noteService.createVersionOfNote(note_, identity.getUserId());
+        if (!"__anonim".equals(identity.getUserId())) {
+          WikiPageParams noteParams = new WikiPageParams(note_.getWikiType(), note_.getWikiOwner(), newNoteName);
+          noteService.removeDraftOfNote(noteParams);
+        }
       } else if (!note_.getContent().equals(note.getContent())) {
         note_.setContent(note.getContent());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT, identity);
-        noteService.createVersionOfNote(note_, currentUser);
-      }
-      if (!"__anonim".equals(currentUser)) {
-        WikiPageParams noteParams = new WikiPageParams(note_.getWikiType(), note_.getWikiOwner(), newNoteName);
-        noteService.removeDraftOfNote(noteParams);
+        noteService.createVersionOfNote(note_, identity.getUserId());
       }
       return Response.ok(note_, MediaType.APPLICATION_JSON).cacheControl(cc).build();
     } catch (IllegalAccessException e) {
@@ -501,39 +485,11 @@ public class NotesRestService implements ResourceContainer {
       if (note == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
-      // remove draft note
-      if (!"__anonim".equals(identity.getUserId())) {
-        WikiPageParams noteParams = new WikiPageParams(note.getWikiType(), note.getWikiOwner(), noteName);
-        noteService.removeDraftOfNote(noteParams);
-      }
       noteService.deleteNote(note.getWikiType(), note.getWikiOwner(), noteName, identity);
       return Response.ok().build();
     } catch (IllegalAccessException e) {
       log.error("User does not have delete permissions on the note {}", noteId, e);
       return Response.status(Response.Status.NOT_FOUND).build();
-    } catch (Exception ex) {
-      log.warn("Failed to perform Delete of noteBook note {}", noteId, ex);
-      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
-    }
-  }
-
-  @DELETE
-  @Path("/draftNote/{noteId}")
-  @RolesAllowed("users")
-  @ApiOperation(value = "Delete note by note's params", httpMethod = "PUT", response = Response.class, notes = "This delets the note if the authenticated user has EDIT permissions.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Request fulfilled"),
-          @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
-          @ApiResponse(code = 404, message = "Resource not found")})
-  public Response deleteDraftNote(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId) {
-
-    try {
-      DraftPage draftNote = noteService.getDraftNoteById(noteId);
-      String draftNoteName = draftNote.getName();
-      if (draftNote == null) {
-        return Response.status(Response.Status.BAD_REQUEST).build();
-      }
-      noteBookService.removeDraft(draftNoteName);
-      return Response.ok().build();
     } catch (Exception ex) {
       log.warn("Failed to perform Delete of noteBook note {}", noteId, ex);
       return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
@@ -578,6 +534,146 @@ public class NotesRestService implements ResourceContainer {
   }
 
   @GET
+  @Path("/note/export/{notes}")
+  @RolesAllowed("users")
+  @ApiOperation(value = "Export notes", httpMethod = "PUT", response = Response.class, notes = "This export selected notes and provide a zip file.")
+  @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
+      @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+      @ApiResponse(code = 404, message = "Resource not found") })
+  public Response exportNote(@ApiParam(value = "List of notes ids", required = true) @PathParam("notes") String notesList,
+                             @ApiParam(value = "exportChildren") @QueryParam("exportChildren") Boolean exportChildren) {
+
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      File zipped = null;
+      List<NoteToExport> notes_ = new ArrayList();
+      String[] notes = notesList.split(",");
+        for (String noteId : notes) {
+          try {
+            Page note = noteService.getNoteById(noteId, identity);
+            if (note == null) {
+              log.warn("Failed to export note {}: note not find ", noteId);
+              continue;
+            }
+            NoteToExport note_ = null;
+            if(BooleanUtils.isTrue(exportChildren)){
+              note_ = noteService.getNoteToExport(new NoteToExport(note.getId(), note.getName(), note.getOwner(), note.getAuthor(), note.getContent(), note.getSyntax(), note.getTitle(), note.getComment(), note.getWikiId(), note.getWikiType(), note.getWikiOwner()));
+            }else{
+              note_ = new NoteToExport(note.getId(), note.getName(), note.getOwner(), note.getAuthor(), note.getContent(), note.getSyntax(), note.getTitle(), note.getComment(), note.getWikiId(), note.getWikiType(), note.getWikiOwner());
+              note_.setParent(noteService.getParentNoteOf(note_));
+              note_.setContent(noteService.processImagesForExport(note.getContent()));
+            }
+            notes_.add(note_);
+          } catch (IllegalAccessException e) {
+            log.error("User does not have  permissions on the note {}", noteId, e);
+           // return Response.status(Response.Status.NOT_FOUND).build();
+          } catch (Exception ex) {
+            log.warn("Failed to export note {} ", noteId, ex);
+          }
+          }
+
+            List<File> files = new ArrayList<>();
+            File temp;
+
+            temp = File.createTempFile("notesExport_"+new Date().getTime(),".txt");
+            ObjectMapper mapper = new ObjectMapper();
+            String json = mapper.writeValueAsString(notes_);
+            String contentUpdated = json;
+            String fileName = "";
+            String filePath = "";
+            while (contentUpdated.contains(IMAGE_URL_REPLACEMENT_PREFIX)) {
+              fileName = contentUpdated.split(IMAGE_URL_REPLACEMENT_PREFIX)[1].split(IMAGE_URL_REPLACEMENT_SUFFIX)[0];
+              filePath = System.getProperty("java.io.tmpdir") + File.separator + fileName;
+              files.add(new File(filePath));
+              contentUpdated = contentUpdated.replace(IMAGE_URL_REPLACEMENT_PREFIX + fileName + IMAGE_URL_REPLACEMENT_SUFFIX, "");
+            }
+            BufferedWriter bw = null;
+            bw = new BufferedWriter(new FileWriter(temp));
+            bw.write(json);
+            if (bw != null) bw.close();
+            files.add(temp);
+            zipped = zipFiles(EXPORT_ZIP_NAME, files);
+
+
+          return Response
+                  .ok(FileUtils.readFileToByteArray(zipped))
+                  .type("application/zip")
+                  .header("Content-Disposition", "attachment; filename=\"notesExport_"+new Date().getTime()+".zip\"")
+                  .build();
+
+      } catch (Exception ex) {
+        log.warn("Failed to export notes ", ex);
+        return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+      }
+    }
+
+
+  @POST
+  @Path("/note/import/{noteId}")
+  @RolesAllowed("users")
+  @ApiOperation(value = "Import notes from a zip file", httpMethod = "POST", response = Response.class, notes = "This import notes from defined zip file under given note.")
+  @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
+      @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+      @ApiResponse(code = 404, message = "Resource not found") })
+  public Response importNote(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId,
+                             @ApiParam(value = "Conflict", required = true) @PathParam("conflict") String conflict,
+                             @ApiParam(value = "note object to be imported", required = true) List<Page> notes) {
+
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      String zipPath = System.getProperty("java.io.tmpdir") + File.separator + EXPORT_ZIP_NAME;
+      unzip(zipPath);
+      Page note_ = noteService.getNoteById(noteId, identity);
+      if (note_ == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      for(Page note : notes) {
+        noteService.importNote(note, note_, noteBookService.getWikiByTypeAndOwner(note_.getWikiType(), note_.getWikiOwner()), conflict);
+      }
+        return Response.ok().build();
+
+    } catch (IllegalAccessException e) {
+      log.error("User does not have move permissions on the note {}", noteId, e);
+      return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (Exception ex) {
+      log.warn("Failed to export note {} ", noteId, ex);
+      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+    }
+  }
+
+  private void unzip(String zipFilePath) throws IOException {
+    File destDir = new File(System.getProperty("java.io.tmpdir"));
+    if (!destDir.exists()) {
+      destDir.mkdir();
+    }
+    ZipInputStream zipIn = new ZipInputStream(new FileInputStream(zipFilePath));
+    ZipEntry entry = zipIn.getNextEntry();
+    while (entry != null) {
+      String filePath = System.getProperty("java.io.tmpdir") + File.separator + entry.getName();
+      if (!entry.isDirectory()) {
+        extractFile(zipIn, filePath);
+      } else {
+        File dir = new File(filePath);
+        dir.mkdirs();
+      }
+      zipIn.closeEntry();
+      entry = zipIn.getNextEntry();
+    }
+    zipIn.close();
+  }
+
+  private void extractFile(ZipInputStream zipIn, String filePath) throws IOException {
+    BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath));
+    byte[] bytesIn = new byte[4096];
+    int read = 0;
+    while ((read = zipIn.read(bytesIn)) != -1) {
+      bos.write(bytesIn, 0, read);
+    }
+    bos.close();
+  }
+
+
+  @GET
   @Path("/tree/{type}")
   @RolesAllowed("users")
   @Produces(MediaType.APPLICATION_JSON)
@@ -597,7 +693,7 @@ public class NotesRestService implements ResourceContainer {
       HashMap<String, Object> context = new HashMap<String, Object>();
       context.put(TreeNode.CAN_EDIT, canEdit);
       if (currentPath != null) {
-        currentPath = URLDecoder.decode(currentPath, "utf-8");
+        currentPath = URLDecoder.decode(currentPath, StandardCharsets.UTF_8);
         context.put(TreeNode.CURRENT_PATH, currentPath);
         WikiPageParams currentNoteParam = TreeUtils.getPageParamsFromPath(currentPath);
         Page currentNote = noteService.getNoteOfNoteBookByName(currentNoteParam.getType(),
@@ -611,7 +707,7 @@ public class NotesRestService implements ResourceContainer {
       HttpServletRequest request = (HttpServletRequest) env.get(HttpServletRequest.class);
 
       // Put select note to context
-      path = URLDecoder.decode(path, "utf-8");
+      path = URLDecoder.decode(path, StandardCharsets.UTF_8);
       context.put(TreeNode.PATH, path);
       WikiPageParams noteParam = TreeUtils.getPageParamsFromPath(path);
       Page note =
@@ -620,7 +716,7 @@ public class NotesRestService implements ResourceContainer {
         log.warn("User [{}] can not get noteBook path [{}]. Home is used instead",
                  ConversationState.getCurrent().getIdentity().getUserId(),
                  path);
-        note = noteService.getNoteOfNoteBookByName(noteParam.getType(), noteParam.getOwner(), noteParam.WIKI_HOME);
+        note = noteService.getNoteOfNoteBookByName(noteParam.getType(), noteParam.getOwner(), WikiPageParams.WIKI_HOME);
         if (note == null) {
           ResourceBundle resourceBundle = resourceBundleService.getResourceBundle("locale.portlet.wiki.WikiPortlet",
                                                                                   request.getLocale());

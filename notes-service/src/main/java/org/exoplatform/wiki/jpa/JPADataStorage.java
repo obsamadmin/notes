@@ -287,7 +287,6 @@ public class JPADataStorage implements DataStorage {
         childrenPages.add(convertPageEntityToPage(childPageEntity));
       }
     }
-
     return childrenPages;
   }
 
