@@ -3,13 +3,19 @@ import NoteTreeviewDrawer from './components/NoteTreeviewDrawer.vue';
 import NotesActionsMenu from './components/NotesActionsMenu.vue';
 import NoteBreadcrumb from './components/NoteBreadcrumb.vue';
 import NoteHistoryDrawer from './components/NoteHistoryDrawer.vue';
+import NoteImportDrawer from './components/NoteImportDrawer.vue';
+import AttachmentsNotesUploadInput from './components/AttachmentsNotesUploadInput.vue';
+import AttachmentsUploadedNotes from './components/AttachmentsUploadedNotes.vue';
 
 const components = {
   'notes-overview': NotesOverview,
   'note-treeview-drawer': NoteTreeviewDrawer,
   'notes-actions-menu': NotesActionsMenu,
   'note-breadcrumb': NoteBreadcrumb,
-  'note-history-drawer': NoteHistoryDrawer
+  'note-history-drawer': NoteHistoryDrawer,
+  'note-import-drawer': NoteImportDrawer,
+  'attachments-notes-upload-input': AttachmentsNotesUploadInput,
+  'attachments-uploaded-notes': AttachmentsUploadedNotes
 };
 
 for (const key in components) {

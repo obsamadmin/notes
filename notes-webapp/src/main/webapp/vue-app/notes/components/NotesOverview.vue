@@ -105,13 +105,17 @@
       :default-path="defaultPath" 
       @open-treeview="$refs.notesBreadcrumb.open(note.id, 'movePage')"
       @export-pdf="createPDF(note)"
-      @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)" />
+      @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)"
+      @open-import-drawer="$refs.noteImportDrawer.open()" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />
     <note-history-drawer
       ref="noteVersionsHistoryDrawer"
       @open-version="displayVersion($event)"
       @restore-version="restoreVersion($event)" />
+      @open-version="displayVersion($event)" />
+    <note-import-drawer
+      ref="noteImportDrawer" />
     <exo-confirm-dialog
       ref="DeleteNoteDialog"
       :message="confirmMessage"
