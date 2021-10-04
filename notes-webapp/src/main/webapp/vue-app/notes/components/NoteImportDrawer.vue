@@ -121,21 +121,7 @@ export default {
     return {
       e6: 1,
       selected: null,
-      message: '',
       value: [],
-      uploadingFilesQueue: [],
-      uploadingCount: 0,
-      maxUploadInProgressCount: 2,
-      maxProgress: 100,
-      showDocumentSelector: false,
-      fileSizeLimitError: false,
-      fileSizeNullError: false,
-      filesCountLimitError: false,
-      sameFileError: false,
-      sameFileErrorMessage: `${this.$t('attachments.drawer.sameFile.error')}`,
-      BYTES_IN_MB: 1048576,
-      MESSAGES_DISPLAY_TIME: 5000,
-      abortUploading: false,
     };
   },
   created() {

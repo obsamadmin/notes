@@ -21,7 +21,7 @@
           class="uploadedFilesItem">
           <div class="showDestination">
             <div class="showFile">
-              <exo-attachment-item :file="attachedFile" />
+              <attachments-notes-item :file="attachedFile" />
             </div>
           </div>
           <v-spacer />
@@ -57,15 +57,6 @@ export default {
     attachments: {
       type: Array,
       default: () => []
-    },
-    maxFilesCount: {
-      type: Number,
-      default: null
-    },
-  },
-  computed: {
-    displayMessageDestinationFolder() {
-      return !this.attachments.length || this.attachments.some(val => val.uploadId != null && val.uploadId !== '');
     },
   },
   methods: {

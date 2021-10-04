@@ -52,25 +52,15 @@ export default {
   },
   data() {
     return {
-      MESSAGES_DISPLAY_TIME: 5000,
       BYTES_IN_MB: 1048576,
       maxUploadInProgressCount: 2,
       uploadingFilesQueue: [],
       uploadingCount: 0,
-      maxProgress: 100,
-      newUploadedFiles: [],
-      abortUploading: false,
+      filesCountLimitError: false,
+      fileSizeLimitError: false,
+      fileSizeNullError: false,
+      sameFileError: false,
     };
-  },
-  watch: {
-    value: {
-      deep: true,
-      handler() {
-        this.$emit('attachmentsChanged', this.value);
-        this.displayMessageDestinationFolder = !this.value.some(val => val.uploadId != null && val.uploadId !== '');
-
-      }
-    },
   },
   methods: {
     uploadFile: function () {
