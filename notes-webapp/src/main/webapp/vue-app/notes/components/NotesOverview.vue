@@ -113,7 +113,6 @@
       ref="noteVersionsHistoryDrawer"
       @open-version="displayVersion($event)"
       @restore-version="restoreVersion($event)" />
-      @open-version="displayVersion($event)" />
     <note-import-drawer
       ref="noteImportDrawer" />
     <exo-confirm-dialog
