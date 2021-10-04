@@ -6,7 +6,10 @@ import org.exoplatform.container.xml.ValuesParam;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.wiki.WikiException;
 import org.exoplatform.wiki.mow.api.*;
-import org.exoplatform.wiki.service.search.*;
+import org.exoplatform.wiki.service.search.SearchResult;
+import org.exoplatform.wiki.service.search.TemplateSearchData;
+import org.exoplatform.wiki.service.search.TemplateSearchResult;
+import org.exoplatform.wiki.service.search.WikiSearchData;
 
 import java.util.List;
 import java.util.Map;
@@ -45,7 +48,7 @@ public interface DataStorage {
 
   public Page getParentPageOf(Page page) throws WikiException;
 
-  public List<Page> getChildrenPageOf(Page page) throws WikiException;
+  public List<Page> getChildrenPageOf(Page page, String userId) throws WikiException;
 
   public void createTemplatePage(Wiki wiki, Template template) throws WikiException;
 
@@ -89,7 +92,25 @@ public interface DataStorage {
 
   public List<DraftPage> getDraftPagesOfUser(String username) throws WikiException;
 
-  public void createDraftPageForUser(DraftPage draftPage, String username) throws WikiException;
+  /**
+   * Creates a new draft note
+   * 
+   * @param draftPage The draft note to be created
+   * @param username Author name
+   * @return Created draft note
+   * @throws WikiException
+   */
+  public DraftPage createDraftPageForUser(DraftPage draftPage, String username) throws WikiException;
+
+  /**
+   * Updates a draft note
+   * 
+   * @param draftPage The draft note to be updated
+   * @param username
+   * @return Updated draft note
+   * @throws WikiException
+   */
+  public DraftPage updateDraftPageForUser(DraftPage draftPage, String username) throws WikiException;
 
   public PageList<SearchResult> search(WikiSearchData data) throws WikiException;
 
