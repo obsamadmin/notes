@@ -26,10 +26,7 @@ import org.exoplatform.wiki.mow.api.*;
 import org.junit.Assert;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class TestNoteService extends BaseTest {
   private WikiService wService;
@@ -279,6 +276,66 @@ public class TestNoteService extends BaseTest {
 
   private String getDraftNameSuffix(long clientTime) {
     return new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date(clientTime));
+  }
+
+
+  public void testExportNotes() throws WikiException, IllegalAccessException {
+    //moving page in same space
+    Identity root = new Identity("root");
+    Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "exportPortal");
+    noteService.createNote(portalWiki, "Home", new Page("exported1", "exported1"),root) ;
+    noteService.createNote(portalWiki, "Home", new Page("exported2", "exported2"),root) ;
+    noteService.createNote(portalWiki, "Home", new Page("exported3", "exported3"),root) ;
+
+    assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported1")) ;
+    assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported2")) ;
+    assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported3")) ;
+
+    String[] notes = new String[3];
+    notes[0] = noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported1").getId();
+    notes[1] = noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported2").getId();
+    notes[2] = noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported3").getId();
+
+    List<NoteToExport> exportedNotes = noteService.getNotesToExport(notes,false,root);
+
+    assertNotNull(exportedNotes);
+    assertEquals(exportedNotes.size(),3);
+  }
+  public void testImportNotes() throws WikiException, IllegalAccessException {
+    //moving page in same space
+    Identity user = new Identity("user");
+    Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "importPortal");
+    noteService.createNote(portalWiki, "Home", new Page("to_be_imported1", "to_be_imported1"),user) ;
+    noteService.createNote(portalWiki, "Home", new Page("to_be_imported2", "to_be_imported2"),user) ;
+    noteService.createNote(portalWiki, "Home", new Page("to_be_imported3", "to_be_imported3"),user) ;
+
+    assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "importPortal", "to_be_imported1")) ;
+    assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "importPortal", "to_be_imported2")) ;
+    assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "importPortal", "to_be_imported3")) ;
+
+    String[] notes = new String[3];
+    notes[0] = noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "importPortal", "to_be_imported1").getId();
+    notes[1] = noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "importPortal", "to_be_imported2").getId();
+    notes[2] = noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "importPortal", "to_be_imported3").getId();
+
+    List<NoteToExport> exportedNotes = noteService.getNotesToExport(notes,false,user);
+
+    assertNotNull(exportedNotes);
+    assertEquals(exportedNotes.size(),3);
+    List<Page> pages = new ArrayList<>();
+    for(NoteToExport exportNote : exportedNotes){
+      Page page = new Page(exportNote.getName(),exportNote.getTitle());
+      page.setId(exportNote.getId());
+      pages.add(page);
+    }
+
+    Wiki userWiki = getOrCreateWiki(wService, PortalConfig.USER_TYPE, "root");
+
+    int childern = noteService.getChildrenNoteOf(userWiki.getWikiHome()).size();
+
+    noteService.importNotes(pages, userWiki.getWikiHome(), userWiki, "update");
+
+    assertEquals(noteService.getChildrenNoteOf(userWiki.getWikiHome()).size(),childern+3);
   }
 
 }

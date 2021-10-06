@@ -1,6 +1,7 @@
 package org.exoplatform.wiki.service.impl;
 
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.BooleanUtils;
 import org.apache.commons.lang.StringUtils;
 import org.exoplatform.container.PortalContainer;
 import org.exoplatform.container.configuration.ConfigurationManager;
@@ -44,6 +45,10 @@ public class NoteServiceImpl implements NoteService {
   public static final String                              ATT_CACHE_NAME                   = "wiki.PageAttachmentCache";
 
   private static final String                             UNTITLED_PREFIX                  = "Untitled_";
+
+  private static final String                             IMAGE_URL_REPLACEMENT_PREFIX = "//-";
+
+  private static final String                            IMAGE_URL_REPLACEMENT_SUFFIX = "-//";
 
   private static final Log                                log                              =
                                                               ExoLogger.getLogger(NoteServiceImpl.class);
@@ -929,12 +934,78 @@ public class NoteServiceImpl implements NoteService {
   /**
    * Recursive method to build the children and parent of a note
    *
-   * @param note
+   * @param notes
 
    * @return
    * @throws WikiException
    */
   @Override
+  public List<NoteToExport> getNotesToExport(String[] notes, boolean exportChildren, Identity identity){
+    List<NoteToExport> notes_ = new ArrayList();
+    for (String noteId : notes) {
+      try {
+        Page note = getNoteById(noteId,identity);
+        if (note == null) {
+          log.warn("Failed to export note {}: note not find ", noteId);
+          continue;
+        }
+        NoteToExport note_ = null;
+        if (BooleanUtils.isTrue(exportChildren)) {
+          note_ = getNoteToExport(new NoteToExport(note.getId(),
+                  note.getName(),
+                  note.getOwner(),
+                  note.getAuthor(),
+                  note.getContent(),
+                  note.getSyntax(),
+                  note.getTitle(),
+                  note.getComment(),
+                  note.getWikiId(),
+                  note.getWikiType(),
+                  note.getWikiOwner()));
+        } else {
+          note_ = new NoteToExport(note.getId(),
+                  note.getName(),
+                  note.getOwner(),
+                  note.getAuthor(),
+                  note.getContent(),
+                  note.getSyntax(),
+                  note.getTitle(),
+                  note.getComment(),
+                  note.getWikiId(),
+                  note.getWikiType(),
+                  note.getWikiOwner());
+          note_.setParent(getParentNoteOf(note_));
+          note_.setContent(processImagesForExport(note.getContent()));
+        }
+        String content = note_.getContent();
+        Map<String, String> urlToReplaces = new HashMap<>();
+        while(content.contains("noteLink")){
+          Page linkedNote =  getNoteById(content.split("class=\"noteLink\" href=\"")[1].split("\"")[0]);
+          String noteParams = IMAGE_URL_REPLACEMENT_PREFIX+linkedNote.getWikiType()+IMAGE_URL_REPLACEMENT_SUFFIX+IMAGE_URL_REPLACEMENT_PREFIX+linkedNote.getWikiOwner()+IMAGE_URL_REPLACEMENT_SUFFIX+IMAGE_URL_REPLACEMENT_PREFIX+linkedNote.getName()+IMAGE_URL_REPLACEMENT_SUFFIX;
+          urlToReplaces.put("class=\"noteLink\" href=\""+linkedNote.getId()+"\"", "class=\"noteLink\" href=\""+noteParams+"\"");
+          content=content.replaceAll("class=\"noteLink\" href=\""+linkedNote.getId()+"\"","");
+        }
+        if(!urlToReplaces.isEmpty()) {
+          note_.setContent(replaceUrl(note_.getContent(), urlToReplaces));
+        }
+        notes_.add(note_);
+      } catch (IllegalAccessException e) {
+        log.error("User does not have  permissions on the note {}", noteId, e);
+      } catch (Exception ex) {
+        log.warn("Failed to export note {} ", noteId, ex);
+      }
+    }
+    return notes_;
+  }
+
+  /**
+   * Recursive method to build the children and parent of a note
+   *
+   * @param note
+
+   * @return
+   * @throws WikiException
+   */
   public NoteToExport getNoteToExport(NoteToExport note) throws WikiException {
     note.setContent(processImagesForExport(note.getContent()));
     List<NoteToExport> children = getChildrenNoteOf(note);
@@ -949,7 +1020,7 @@ public class NoteServiceImpl implements NoteService {
     return note;
   }
 
-  @Override
+
   public List<File>  getFilesfromContent(NoteToExport note, List<File> files) throws WikiException {
     String contentUpdated = note.getContent();
     String fileName = "";
@@ -968,16 +1039,36 @@ public class NoteServiceImpl implements NoteService {
   }
 
   /**
-   *
+   * Process images by creting images found in the content
    *
    * @param content
 
    * @return
    * @throws WikiException
    */
-  @Override
   public String processImagesForExport(String content) throws WikiException {
    return htmlUploadImageProcessor.processImagesForExport(content);
+  }
+
+  /**
+   *  importe a list of notes
+   *
+   * @param notes
+
+   * @return
+   * @throws WikiException
+   */
+  @Override
+  public void importNotes(List<Page> notes, Page parent, Wiki wiki, String conflict) throws WikiException {
+    for (Page note : notes) {
+      importNote(note,
+              parent,
+              wikiService.getWikiByTypeAndOwner(parent.getWikiType(), parent.getWikiOwner()),
+              conflict);
+    }
+    for(Page note : notes){
+      replaceIncludedPages(note, wiki);
+    }
   }
 
   /**
@@ -988,7 +1079,6 @@ public class NoteServiceImpl implements NoteService {
    * @return
    * @throws WikiException
    */
-  @Override
   public void importNote(Page note, Page parent, Wiki wiki, String conflict) throws WikiException {
 
     Page  parent_ = getNoteOfNoteBookByName(wiki.getType(),wiki.getOwner(),parent.getName());
@@ -999,40 +1089,115 @@ public class NoteServiceImpl implements NoteService {
     if(!note.getName().equals("Home")){
       note.setId(null);
       Page note_2 = getNoteOfNoteBookByName(wiki.getType(),wiki.getOwner(),note.getName());
-      if(note_2!=null){
+      if(note_2==null){
+        if (wiki.getType().toUpperCase().equals(WikiType.GROUP.name())) {
+          note.setContent(htmlUploadImageProcessor.processSpaceImages(note.getContent(), wiki.getOwner(), "Notes"));
+        }
+        if (wiki.getType().toUpperCase().equals(WikiType.USER.name())) {
+          note.setContent(htmlUploadImageProcessor.processUserImages(note.getContent(), wiki.getOwner(), "Notes"));
+        }
         note_ = createNote(wiki,parent_,note);
       }else{
-        if(conflict.equals("overwrite")){
-          deleteNote(wiki.getType(),wiki.getOwner(),note.getName());
-          note_ = createNote(wiki,parent_,note);
-        }if(conflict.equals("duplicate")){
-          int i = 1;
-          String newTitle = note.getTitle() + "_" + i;
-          while (getNoteOfNoteBookByName(wiki.getType(),wiki.getOwner(),newTitle)!=null){
-            i++;
-            newTitle = note.getTitle() + "_" + i;
+        if(StringUtils.isNotEmpty(conflict)) {
+          if (conflict.equals("overwrite")) {
+            deleteNote(wiki.getType(), wiki.getOwner(), note.getName());
+            if (wiki.getType().toUpperCase().equals(WikiType.GROUP.name())) {
+              note.setContent(htmlUploadImageProcessor.processSpaceImages(note.getContent(), wiki.getOwner(), "Notes"));
+            }
+            if (wiki.getType().toUpperCase().equals(WikiType.USER.name())) {
+              note.setContent(htmlUploadImageProcessor.processUserImages(note.getContent(), wiki.getOwner(), "Notes"));
+            }
+            note_ = createNote(wiki, parent_, note);
           }
-          note.setName(newTitle);
-          note.setTitle(newTitle);
-          note_ = createNote(wiki,parent_,note);
-        }if(conflict.equals("update")){
-          if(!note_2.getTitle().equals(note.getTitle())||!note_2.getContent().equals(note.getContent())){
-            note_2.setContent(note.getContent());
-            note_2.setTitle(note.getTitle());
-            updateNote(note);
+          if (conflict.equals("duplicate")) {
+            int i = 1;
+            String newTitle = note.getTitle() + "_" + i;
+            while (getNoteOfNoteBookByName(wiki.getType(), wiki.getOwner(), newTitle) != null) {
+              i++;
+              newTitle = note.getTitle() + "_" + i;
+            }
+            note.setName(newTitle);
+            note.setTitle(newTitle);
+            if (wiki.getType().toUpperCase().equals(WikiType.GROUP.name())) {
+              note.setContent(htmlUploadImageProcessor.processSpaceImages(note.getContent(), wiki.getOwner(), "Notes"));
+            }
+            if (wiki.getType().toUpperCase().equals(WikiType.USER.name())) {
+              note.setContent(htmlUploadImageProcessor.processUserImages(note.getContent(), wiki.getOwner(), "Notes"));
+            }
+            note_ = createNote(wiki, parent_, note);
+          }
+          if (conflict.equals("update")) {
+            if (!note_2.getTitle().equals(note.getTitle()) || !note_2.getContent().equals(note.getContent())) {
+              note_2.setContent(note.getContent());
+              note_2.setTitle(note.getTitle());
+              if (wiki.getType().toUpperCase().equals(WikiType.GROUP.name())) {
+                note.setContent(htmlUploadImageProcessor.processSpaceImages(note.getContent(), wiki.getOwner(), "Notes"));
+              }
+              if (wiki.getType().toUpperCase().equals(WikiType.USER.name())) {
+                note.setContent(htmlUploadImageProcessor.processUserImages(note.getContent(), wiki.getOwner(), "Notes"));
+              }
+              updateNote(note);
+            }
           }
         }
       }
     }else{
-      if(conflict.equals("update")){
+      if(StringUtils.isNotEmpty(conflict) && (conflict.equals("update")||conflict.equals("overwrite"))){
         Page note_1 = getNoteOfNoteBookByName(wiki.getType(),wiki.getOwner(),note.getName());
+        if (wiki.getType().toUpperCase().equals(WikiType.GROUP.name())) {
+          note.setContent(htmlUploadImageProcessor.processSpaceImages(note.getContent(), wiki.getOwner(), "Notes"));
+        }
+        if (wiki.getType().toUpperCase().equals(WikiType.USER.name())) {
+          note.setContent(htmlUploadImageProcessor.processUserImages(note.getContent(), wiki.getOwner(), "Notes"));
+        }
         note_1.setContent(note.getContent());
         updateNote(note);
       }
     }
-    for (Page child: note.getChildren()){
-      importNote(child, note_, wiki, conflict);
+    if (note.getChildren() != null) {
+      for (Page child : note.getChildren()) {
+        importNote(child, note_, wiki, conflict);
+      }
     }
   }
 
+  private void replaceIncludedPages(Page note, Wiki wiki) throws WikiException{
+    Page note_ = getNoteOfNoteBookByName(wiki.getType(),wiki.getOwner(),note.getName());
+    if(note_!=null) {
+      String content = note_.getContent();
+      if (content.contains("class=\"noteLink\" href=\"//-")) {
+        while (content.contains("class=\"noteLink\" href=\"//-")) {
+          String linkedParams = content.split("class=\"noteLink\" href=\"//-")[1].split("-//\"")[0];
+          String noteBookType = linkedParams.split("-////-")[0];
+          String noteBookOwner = linkedParams.split("-////-")[1];
+          String NoteName = linkedParams.split("-////-")[2];
+          Page linkedNote = null;
+          linkedNote = getNoteOfNoteBookByName(wiki.getType(), wiki.getOwner(), NoteName);
+          if (linkedNote != null) {
+            content = content.replaceAll("\"noteLink\" href=\"//-" + linkedParams + "-//",
+                                         "\"noteLink\" href=\"" + linkedNote.getId());
+            if(content.equals(note_.getContent())) break;
+          }
+        }
+        if(!content.equals(note_.getContent())){
+          note_.setContent(content);
+          updateNote(note_);
+        }
+      }
+    }
+    if (note.getChildren() != null) {
+      for (Page child : note.getChildren()) {
+        replaceIncludedPages(child, wiki);
+      }
+    }
+  }
+
+  private String replaceUrl(String body, Map<String, String> urlToReplaces) {
+    for (String url : urlToReplaces.keySet()) {
+      while (body.contains(url)) {
+        body = body.replace(url, urlToReplaces.get(url));
+      }
+    }
+    return body;
+  }
 }

@@ -16,16 +16,11 @@
  */
 package org.exoplatform.wiki.service.rest;
 
-import io.swagger.annotations.*;
-import io.swagger.jaxrs.PATCH;
 import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
@@ -36,11 +31,15 @@ import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.BooleanUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.exoplatform.common.http.HTTPStatus;
 import org.exoplatform.commons.utils.HTMLSanitizer;
 import org.exoplatform.services.log.ExoLogger;
@@ -65,7 +64,6 @@ import org.exoplatform.wiki.tree.TreeNode.TREETYPE;
 import org.exoplatform.wiki.tree.WikiTreeNode;
 import org.exoplatform.wiki.tree.utils.TreeUtils;
 import org.exoplatform.wiki.utils.Utils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.swagger.annotations.*;
 import io.swagger.jaxrs.PATCH;
@@ -76,17 +74,23 @@ import io.swagger.jaxrs.PATCH;
 
 public class NotesRestService implements ResourceContainer {
 
-  private static final String         NOTE_NAME_EXISTS = "Note name already exists";
-  private static final Log                  log = ExoLogger.getLogger(NotesRestService.class);
+  private static final String         NOTE_NAME_EXISTS             = "Note name already exists";
+
+  private static final Log            log                          = ExoLogger.getLogger(NotesRestService.class);
+
+  private static final String         IMAGE_URL_REPLACEMENT_PREFIX = "//-";
+
+  private static final String         IMAGE_URL_REPLACEMENT_SUFFIX = "-//";
+
+  private static final String         EXPORT_ZIP_NAME              = "ziped.zip";
+
   private final NoteService           noteService;
+
   private final WikiService           noteBookService;
+
   private final ResourceBundleService resourceBundleService;
+
   private final CacheControl          cc;
-  private static final String          IMAGE_URL_REPLACEMENT_PREFIX = "//-";
-  private static final String          IMAGE_URL_REPLACEMENT_SUFFIX = "-//";
-  private static final String          EXPORT_ZIP_NAME = "ziped.zip";
-
-
 
   public NotesRestService(NoteService noteService, WikiService noteBookService, ResourceBundleService resourceBundleService) {
     this.noteService = noteService;
@@ -97,16 +101,13 @@ public class NotesRestService implements ResourceContainer {
     cc.setNoStore(true);
   }
 
-  public static File zipFiles(String zipFileName, List<File> addToZip)
-          throws IOException {
+  public static File zipFiles(String zipFileName, List<File> addToZip) throws IOException {
 
-    String zipPath = System.getProperty("java.io.tmpdir")
-            + File.separator + zipFileName;
+    String zipPath = System.getProperty("java.io.tmpdir") + File.separator + zipFileName;
     new File(zipPath).delete();
 
     try (FileOutputStream fos = new FileOutputStream(zipPath);
-         ZipOutputStream zos = new ZipOutputStream(
-                 new BufferedOutputStream(fos))) {
+        ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
       zos.setLevel(9);
 
       for (File file : addToZip) {
@@ -144,12 +145,12 @@ public class NotesRestService implements ResourceContainer {
     try {
       Identity identity = ConversationState.getCurrent().getIdentity();
       Wiki noteBook = null;
-      noteBook = noteBookService.getWikiByTypeAndOwner(noteBookType,noteBookOwner);
-      if(noteBook == null) {
+      noteBook = noteBookService.getWikiByTypeAndOwner(noteBookType, noteBookOwner);
+      if (noteBook == null) {
         noteBook = noteBookService.createWiki(noteBookType, noteBookOwner);
       }
       Page note = null;
-      if(noteId.equals("homeNote")){
+      if (noteId.equals("homeNote")) {
         noteId = noteBook.getWikiHome().getId();
         note = noteService.getNoteById(noteId, identity, source);
       } else {
@@ -157,6 +158,24 @@ public class NotesRestService implements ResourceContainer {
       }
       if (note == null) {
         return Response.status(Response.Status.NOT_FOUND).build();
+      }
+      String content = note.getContent();
+      if (content.contains("class=\"noteLink\" href=\"//-")) {
+        while (content.contains("class=\"noteLink\" href=\"//-")) {
+          String linkedParams = content.split("class=\"noteLink\" href=\"//-")[1].split("-//\"")[0];
+          String NoteName = linkedParams.split("-////-")[2];
+          Page linkedNote = null;
+          linkedNote = noteService.getNoteOfNoteBookByName(note.getWikiType(), note.getWikiOwner(), NoteName);
+          if (linkedNote != null) {
+            content = content.replaceAll("\"noteLink\" href=\"//-" + linkedParams + "-//",
+                    "\"noteLink\" href=\"" + linkedNote.getId());
+            if(content.equals(note.getContent())) break;
+          }
+        }
+        if(!content.equals(note.getContent())){
+          note.setContent(content);
+          noteService.updateNote(note);
+        }
       }
       note.setContent(HTMLSanitizer.sanitize(note.getContent()));
       note.setBreadcrumb(noteService.getBreadcumb(noteBookType, noteBookOwner, noteId));
@@ -188,10 +207,10 @@ public class NotesRestService implements ResourceContainer {
       if (note == null) {
         return Response.status(Response.Status.NOT_FOUND).build();
       }
-      if(StringUtils.isNotEmpty(noteBookType) && !note.getWikiType().equals(noteBookType)) {
+      if (StringUtils.isNotEmpty(noteBookType) && !note.getWikiType().equals(noteBookType)) {
         return Response.status(Response.Status.NOT_FOUND).build();
       }
-      if(StringUtils.isNotEmpty(noteBookOwner) && !note.getWikiOwner().equals(noteBookOwner)) {
+      if (StringUtils.isNotEmpty(noteBookOwner) && !note.getWikiOwner().equals(noteBookOwner)) {
         return Response.status(Response.Status.NOT_FOUND).build();
       }
       note.setContent(HTMLSanitizer.sanitize(note.getContent()));
@@ -212,8 +231,8 @@ public class NotesRestService implements ResourceContainer {
   @RolesAllowed("users")
   @ApiOperation(value = "Get versions of note by id", httpMethod = "GET", response = Response.class, notes = "This get the versions of a note if the authenticated user has permissions to view the objects linked to this note.")
   @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
-    @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
-    @ApiResponse(code = 404, message = "Resource not found") })
+      @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+      @ApiResponse(code = 404, message = "Resource not found") })
   public Response getNoteVersions(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId) {
     try {
       Identity identity = ConversationState.getCurrent().getIdentity();
@@ -332,7 +351,7 @@ public class NotesRestService implements ResourceContainer {
           note_.setName(newNoteName);
         }
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT_AND_TITLE, identity);
-        noteService.createVersionOfNote(note_,identity.getUserId());
+        noteService.createVersionOfNote(note_, identity.getUserId());
         if (!"__anonim".equals(identity.getUserId())) {
           WikiPageParams noteParams = new WikiPageParams(noteBookType, noteBookOwner, newNoteName);
           // noteService.removeDraftOfNote(noteParams);
@@ -546,67 +565,44 @@ public class NotesRestService implements ResourceContainer {
     try {
       Identity identity = ConversationState.getCurrent().getIdentity();
       File zipped = null;
-      List<NoteToExport> notes_ = new ArrayList();
+
       String[] notes = notesList.split(",");
-        for (String noteId : notes) {
-          try {
-            Page note = noteService.getNoteById(noteId, identity);
-            if (note == null) {
-              log.warn("Failed to export note {}: note not find ", noteId);
-              continue;
-            }
-            NoteToExport note_ = null;
-            if(BooleanUtils.isTrue(exportChildren)){
-              note_ = noteService.getNoteToExport(new NoteToExport(note.getId(), note.getName(), note.getOwner(), note.getAuthor(), note.getContent(), note.getSyntax(), note.getTitle(), note.getComment(), note.getWikiId(), note.getWikiType(), note.getWikiOwner()));
-            }else{
-              note_ = new NoteToExport(note.getId(), note.getName(), note.getOwner(), note.getAuthor(), note.getContent(), note.getSyntax(), note.getTitle(), note.getComment(), note.getWikiId(), note.getWikiType(), note.getWikiOwner());
-              note_.setParent(noteService.getParentNoteOf(note_));
-              note_.setContent(noteService.processImagesForExport(note.getContent()));
-            }
-            notes_.add(note_);
-          } catch (IllegalAccessException e) {
-            log.error("User does not have  permissions on the note {}", noteId, e);
-           // return Response.status(Response.Status.NOT_FOUND).build();
-          } catch (Exception ex) {
-            log.warn("Failed to export note {} ", noteId, ex);
-          }
-          }
+      List<NoteToExport> notes_ = noteService.getNotesToExport(notes, exportChildren, identity);
+      List<File> files = new ArrayList<>();
+      File temp;
 
-            List<File> files = new ArrayList<>();
-            File temp;
-
-            temp = File.createTempFile("notesExport_"+new Date().getTime(),".txt");
-            ObjectMapper mapper = new ObjectMapper();
-            String json = mapper.writeValueAsString(notes_);
-            String contentUpdated = json;
-            String fileName = "";
-            String filePath = "";
-            while (contentUpdated.contains(IMAGE_URL_REPLACEMENT_PREFIX)) {
-              fileName = contentUpdated.split(IMAGE_URL_REPLACEMENT_PREFIX)[1].split(IMAGE_URL_REPLACEMENT_SUFFIX)[0];
-              filePath = System.getProperty("java.io.tmpdir") + File.separator + fileName;
-              files.add(new File(filePath));
-              contentUpdated = contentUpdated.replace(IMAGE_URL_REPLACEMENT_PREFIX + fileName + IMAGE_URL_REPLACEMENT_SUFFIX, "");
-            }
-            BufferedWriter bw = null;
-            bw = new BufferedWriter(new FileWriter(temp));
-            bw.write(json);
-            if (bw != null) bw.close();
-            files.add(temp);
-            zipped = zipFiles(EXPORT_ZIP_NAME, files);
-
-
-          return Response
-                  .ok(FileUtils.readFileToByteArray(zipped))
-                  .type("application/zip")
-                  .header("Content-Disposition", "attachment; filename=\"notesExport_"+new Date().getTime()+".zip\"")
-                  .build();
-
-      } catch (Exception ex) {
-        log.warn("Failed to export notes ", ex);
-        return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+      temp = File.createTempFile("notesExport_" + new Date().getTime(), ".txt");
+      ObjectMapper mapper = new ObjectMapper();
+      String json = mapper.writeValueAsString(notes_);
+      String contentUpdated = json;
+      String fileName = "";
+      String filePath = "";
+      while (contentUpdated.contains(IMAGE_URL_REPLACEMENT_PREFIX)) {
+        fileName = contentUpdated.split(IMAGE_URL_REPLACEMENT_PREFIX)[1].split(IMAGE_URL_REPLACEMENT_SUFFIX)[0];
+        filePath = System.getProperty("java.io.tmpdir") + File.separator + fileName;
+        files.add(new File(filePath));
+        contentUpdated = contentUpdated.replace(IMAGE_URL_REPLACEMENT_PREFIX + fileName + IMAGE_URL_REPLACEMENT_SUFFIX, "");
       }
-    }
+      BufferedWriter bw = null;
+      bw = new BufferedWriter(new FileWriter(temp));
+      bw.write(json);
+      if (bw != null)
+        bw.close();
+      files.add(temp);
+      zipped = zipFiles(EXPORT_ZIP_NAME, files);
+      for(File file:files){
+        file.delete();
+      }
+      return Response.ok(FileUtils.readFileToByteArray(zipped))
+                     .type("application/zip")
+                     .header("Content-Disposition", "attachment; filename=\"notesExport_" + new Date().getTime() + ".zip\"")
+                     .build();
 
+    } catch (Exception ex) {
+      log.warn("Failed to export notes ", ex);
+      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+    }
+  }
 
   @POST
   @Path("/note/import/{noteId}")
@@ -616,21 +612,32 @@ public class NotesRestService implements ResourceContainer {
       @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
       @ApiResponse(code = 404, message = "Resource not found") })
   public Response importNote(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId,
-                             @ApiParam(value = "Conflict", required = true) @PathParam("conflict") String conflict,
-                             @ApiParam(value = "note object to be imported", required = true) List<Page> notes) {
+                             @ApiParam(value = "Conflict", required = true) @QueryParam("conflict") String conflict) {
 
     try {
+
       Identity identity = ConversationState.getCurrent().getIdentity();
-      String zipPath = System.getProperty("java.io.tmpdir") + File.separator + EXPORT_ZIP_NAME;
-      unzip(zipPath);
       Page note_ = noteService.getNoteById(noteId, identity);
       if (note_ == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
-      for(Page note : notes) {
-        noteService.importNote(note, note_, noteBookService.getWikiByTypeAndOwner(note_.getWikiType(), note_.getWikiOwner()), conflict);
+      String zipPath = System.getProperty("java.io.tmpdir") + File.separator + EXPORT_ZIP_NAME;
+      List<String> files = unzip(zipPath);
+      String notesFilePath = "";
+      for (String file :files){
+        if(file.contains("notesExport_")){{
+          notesFilePath = file;
+          break;
+        }}
       }
-        return Response.ok().build();
+      if(!notesFilePath.equals("")) {
+        ObjectMapper mapper = new ObjectMapper();
+        List<Page> notes = mapper.readValue(new File(notesFilePath), new TypeReference<List<Page>>() {
+        });
+        Wiki wiki = noteBookService.getWikiByTypeAndOwner(note_.getWikiType(), note_.getWikiOwner());
+        noteService.importNotes(notes, note_, wiki, conflict);
+      }
+      return Response.ok().build();
 
     } catch (IllegalAccessException e) {
       log.error("User does not have move permissions on the note {}", noteId, e);
@@ -641,17 +648,26 @@ public class NotesRestService implements ResourceContainer {
     }
   }
 
-  private void unzip(String zipFilePath) throws IOException {
-    File destDir = new File(System.getProperty("java.io.tmpdir"));
+  private List<String> unzip(String zipFilePath) throws IOException {
+/*    String fileName = "zip";
+    List<String> files = new ArrayList<>();
+    int index = EXPORT_ZIP_NAME.lastIndexOf('.');
+    if(index > 0) {
+      fileName = EXPORT_ZIP_NAME.substring(0,index);
+    }*/
+    List<String> files = new ArrayList<>();
+    String folderPath = System.getProperty("java.io.tmpdir");//+ File.separator + fileName;
+    File destDir = new File(folderPath);
     if (!destDir.exists()) {
       destDir.mkdir();
     }
     ZipInputStream zipIn = new ZipInputStream(new FileInputStream(zipFilePath));
     ZipEntry entry = zipIn.getNextEntry();
     while (entry != null) {
-      String filePath = System.getProperty("java.io.tmpdir") + File.separator + entry.getName();
+      String filePath = folderPath + File.separator + entry.getName();
       if (!entry.isDirectory()) {
         extractFile(zipIn, filePath);
+        files.add(filePath);
       } else {
         File dir = new File(filePath);
         dir.mkdirs();
@@ -660,6 +676,7 @@ public class NotesRestService implements ResourceContainer {
       entry = zipIn.getNextEntry();
     }
     zipIn.close();
+    return files;
   }
 
   private void extractFile(ZipInputStream zipIn, String filePath) throws IOException {
@@ -671,7 +688,6 @@ public class NotesRestService implements ResourceContainer {
     }
     bos.close();
   }
-
 
   @GET
   @Path("/tree/{type}")

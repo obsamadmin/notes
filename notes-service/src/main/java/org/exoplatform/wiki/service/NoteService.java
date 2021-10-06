@@ -318,13 +318,9 @@ public interface NoteService {
    */
   DraftPage createDraftForNewPage(DraftPage draftNoteToSave, long currentTimeMillis) throws WikiException;
 
-  NoteToExport getNoteToExport(NoteToExport note) throws WikiException;
+  List<NoteToExport> getNotesToExport(String[] notes, boolean exportChildren, Identity identity);
 
-  List<File>  getFilesfromContent(NoteToExport note, List<File> files) throws WikiException;
-
-  String processImagesForExport(String content) throws WikiException;
-
-  void importNote(Page note, Page parent, Wiki wiki, String conflict) throws WikiException;
+  void importNotes(List<Page> notes, Page parent, Wiki wiki, String conflict) throws WikiException;
 
   List<NoteToExport> getChildrenNoteOf(NoteToExport note) throws WikiException;
 
