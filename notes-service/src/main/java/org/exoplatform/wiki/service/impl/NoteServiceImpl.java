@@ -129,7 +129,10 @@ public class NoteServiceImpl implements NoteService {
       } catch (Exception e) {
        log.warn("can't process note's images");
       }
+      Space space = spaceService.getSpaceByGroupId(note.getWikiOwner());
       Page createdPage = createNote(noteBook, parentPage, note);
+      createdPage.setCanManage(canManageNotes( userIdentity.getUserId(), space, note));
+      createdPage.setCanView(canViewNotes( userIdentity.getUserId(), space, note));
       createdPage.setToBePublished(note.isToBePublished());
       createdPage.setAppName(note.getAppName());
       createdPage.setUrl(Utils.getPageUrl(createdPage));
@@ -201,6 +204,8 @@ public class NoteServiceImpl implements NoteService {
     Page updatedPage = getNoteById(note.getId());
     updatedPage.setUrl(Utils.getPageUrl(updatedPage));
     updatedPage.setToBePublished(note.isToBePublished());
+    updatedPage.setCanManage(note.isCanManage());
+    updatedPage.setCanView(note.isCanView());
     updatedPage.setAppName(note.getAppName());
     postUpdatePage(updatedPage.getWikiType(), updatedPage.getWikiOwner(), updatedPage.getName(), updatedPage, type);
 
@@ -614,7 +619,9 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setNewPage(false);
     newDraftPage.setTitle(draftNoteToUpdate.getTitle());
     newDraftPage.setTargetPageId(draftNoteToUpdate.getTargetPageId());
+    newDraftPage.setParentPageId(draftNoteToUpdate.getParentPageId());
     newDraftPage.setContent(draftNoteToUpdate.getContent());
+    newDraftPage.setSyntax(draftNoteToUpdate.getSyntax());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
     if (StringUtils.isEmpty(revision)) {
@@ -644,8 +651,10 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setNewPage(true);
     newDraftPage.setTitle(draftNoteToUpdate.getTitle());
     newDraftPage.setTargetPageId(draftNoteToUpdate.getTargetPageId());
+    newDraftPage.setParentPageId(draftNoteToUpdate.getParentPageId());
     newDraftPage.setTargetPageRevision("1");
     newDraftPage.setContent(draftNoteToUpdate.getContent());
+    newDraftPage.setSyntax(draftNoteToUpdate.getSyntax());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
 
@@ -664,6 +673,7 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setNewPage(false);
     newDraftPage.setTitle(draftPage.getTitle());
     newDraftPage.setTargetPageId(targetPage.getId());
+    newDraftPage.setParentPageId(draftPage.getParentPageId());
     newDraftPage.setContent(draftPage.getContent());
     newDraftPage.setSyntax(draftPage.getSyntax());
     newDraftPage.setCreatedDate(new Date(clientTime));
@@ -695,7 +705,9 @@ public class NoteServiceImpl implements NoteService {
     newDraftPage.setTitle(draftPage.getTitle());
     newDraftPage.setTargetPageId(draftPage.getTargetPageId());
     newDraftPage.setTargetPageRevision("1");
+    newDraftPage.setParentPageId(draftPage.getParentPageId());
     newDraftPage.setContent(draftPage.getContent());
+    newDraftPage.setSyntax(draftPage.getSyntax());
     newDraftPage.setCreatedDate(new Date(clientTime));
     newDraftPage.setUpdatedDate(new Date(clientTime));
 

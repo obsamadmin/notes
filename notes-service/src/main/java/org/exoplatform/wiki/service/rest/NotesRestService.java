@@ -34,12 +34,11 @@ import javax.ws.rs.core.Response;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.BooleanUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.common.http.HTTPStatus;
 import org.exoplatform.commons.utils.HTMLSanitizer;
 import org.exoplatform.services.log.ExoLogger;
@@ -49,6 +48,7 @@ import org.exoplatform.services.rest.impl.EnvironmentContext;
 import org.exoplatform.services.rest.resource.ResourceContainer;
 import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
+import org.exoplatform.wiki.mow.api.DraftPage;
 import org.exoplatform.wiki.mow.api.NoteToExport;
 import org.exoplatform.wiki.mow.api.Page;
 import org.exoplatform.wiki.mow.api.Wiki;
@@ -308,6 +308,78 @@ public class NotesRestService implements ResourceContainer {
     }
   }
 
+  @POST
+  @Path("saveDraft")
+  @RolesAllowed("users")
+  @ApiOperation(value = "Add or update a new note draft page", httpMethod = "POST", response = Response.class, notes = "This adds a new note draft page or updates an existing one.")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Request fulfilled"),
+          @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+          @ApiResponse(code = 404, message = "Resource not found")})
+  public Response saveDraft(@ApiParam(value = "Note draft page object to be created", required = true) DraftPage draftNoteToSave) {
+    if (draftNoteToSave == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    if (NumberUtils.isNumber(draftNoteToSave.getTitle())) {
+      log.warn("Draft Note's title should not be number");
+      return Response.status(Response.Status.BAD_REQUEST).entity("{ message: Draft Note's title should not be number}").build();
+    }
+
+    String noteBookType = draftNoteToSave.getWikiType();
+    String noteBookOwner = draftNoteToSave.getWikiOwner();
+    Page parentNote;
+    Page targetNote = null;
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      if (StringUtils.isNoneEmpty(draftNoteToSave.getParentPageId())) {
+        parentNote = noteService.getNoteById(draftNoteToSave.getParentPageId(), identity);
+        if (parentNote != null) {
+          noteBookType = parentNote.getWikiType();
+          noteBookOwner = parentNote.getWikiOwner();
+          draftNoteToSave.setParentPageName(parentNote.getName());
+        } else {
+          return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+      }
+      if (StringUtils.isEmpty(noteBookType) || StringUtils.isEmpty(noteBookOwner)) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      Wiki noteBook = noteBookService.getWikiByTypeAndOwner(noteBookType, noteBookOwner);
+      if (noteBook == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      if (StringUtils.isNoneEmpty(draftNoteToSave.getTargetPageId())) {
+        targetNote = noteService.getNoteById(draftNoteToSave.getTargetPageId());
+        if (targetNote == null) {
+          return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+      }
+
+      String syntaxId = noteBookService.getDefaultWikiSyntaxId();
+      String currentUser = identity.getUserId();
+      draftNoteToSave.setAuthor(currentUser);
+      draftNoteToSave.setSyntax(syntaxId);
+
+      if (StringUtils.isNoneEmpty(draftNoteToSave.getId())) {
+        if (targetNote != null) {
+          draftNoteToSave = noteService.updateDraftForExistPage(draftNoteToSave, targetNote, null, System.currentTimeMillis(), currentUser);
+        } else {
+          draftNoteToSave = noteService.updateDraftForNewPage(draftNoteToSave, System.currentTimeMillis());
+        }
+      } else {
+        if (targetNote != null) {
+          draftNoteToSave = noteService.createDraftForExistPage(draftNoteToSave, targetNote, null, System.currentTimeMillis(), currentUser);
+        } else {
+          draftNoteToSave = noteService.createDraftForNewPage(draftNoteToSave, System.currentTimeMillis());
+        }
+      }
+
+      return Response.ok(draftNoteToSave, MediaType.APPLICATION_JSON).cacheControl(cc).build();
+    } catch (Exception ex) {
+      log.warn("Failed to perform save noteBook draft note {}:{}:{}", noteBookType, noteBookOwner, draftNoteToSave.getId(), ex);
+      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+    }
+  }
+
   @PUT
   @Path("/note/{noteBookType}/{noteBookOwner:.+}/{noteId}")
   @RolesAllowed("users")
@@ -456,6 +528,44 @@ public class NotesRestService implements ResourceContainer {
       return Response.status(Response.Status.NOT_FOUND).build();
     } catch (Exception ex) {
       log.error("Failed to perform update noteBook note {}:{}:{}", note.getWikiType(), note.getWikiOwner(), note.getId(), ex);
+      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+    }
+  }
+
+  @PUT
+  @Path("/restore/{noteVersion}")
+  @RolesAllowed("users")
+  @ApiOperation(value = "Restore a specific note version by version id", httpMethod = "PUT", response = Response.class, notes = "This restore the note if the authenticated user has UPDATE permissions.")
+  @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
+    @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+    @ApiResponse(code = 404, message = "Resource not found") })
+  public Response RestoreNoteVersion(@ApiParam(value = "Version Number", required = true) @PathParam("noteVersion") String noteVersion,
+                                 @ApiParam(value = "note object to be updated", required = true) Page note) {
+    if (note == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    if (NumberUtils.isNumber(note.getTitle())) {
+      log.warn("Note's title should not be number");
+      return Response.status(Response.Status.BAD_REQUEST).entity("{ message: Note's title should not be number}").build();
+    }
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      String currentUser = identity.getUserId();
+      Page note_ = noteService.getNoteById(note.getId(), identity);
+      if (note_ == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      if (!note_.isCanManage()) {
+        return Response.status(Response.Status.FORBIDDEN).build();
+      }
+      noteService.restoreVersionOfNote(noteVersion,note,currentUser);
+      return Response.ok(note_, MediaType.APPLICATION_JSON).cacheControl(cc).build();
+    } catch (IllegalAccessException e) {
+      log.error("User does not have permissions to restore the note {} version", note.getId(), e);
+      return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (Exception ex) {
+      log.error("Failed to perform restore note version {}", noteVersion, ex);
       return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
     }
   }

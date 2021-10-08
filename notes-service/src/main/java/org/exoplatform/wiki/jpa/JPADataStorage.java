@@ -33,6 +33,7 @@ import org.exoplatform.portal.config.UserACL;
 import org.exoplatform.portal.config.UserPortalConfig;
 import org.exoplatform.portal.config.UserPortalConfigService;
 import org.exoplatform.portal.config.model.PortalConfig;
+import org.exoplatform.services.security.ConversationState;
 import org.exoplatform.services.security.Identity;
 import org.exoplatform.services.security.IdentityConstants;
 import org.exoplatform.wiki.WikiException;
@@ -277,7 +278,7 @@ public class JPADataStorage implements DataStorage {
     PageEntity pageEntity = pageDAO.getPageOfWikiByName(page.getWikiType(), page.getWikiOwner(), page.getName());
     if (pageEntity == null) {
       throw new WikiException("Cannot get children of page " + page.getWikiType() + ":" + page.getWikiOwner() + ":"
-          + page.getName() + " because page does not exist.");
+              + page.getName() + " because page does not exist.");
     }
 
     List<Page> childrenPages = new ArrayList<>();
@@ -287,6 +288,17 @@ public class JPADataStorage implements DataStorage {
         childrenPages.add(convertPageEntityToPage(childPageEntity));
       }
     }
+
+    List<DraftPageEntity> draftPageEntities;
+    draftPageEntities = draftPageDAO.findDraftPagesByUserAndParentPage(ConversationState.getCurrent().getIdentity().getUserId(), pageEntity.getId());
+
+    if (!draftPageEntities.isEmpty()) {
+      for (DraftPageEntity draftPageEntity : draftPageEntities) {
+        childrenPages.add(convertDraftPageEntityToDraftPage(draftPageEntity));
+      }
+
+    }
+
     return childrenPages;
   }
 

@@ -28,6 +28,17 @@
         {{ $t('notes.label.breadcrumbTitle') }}
       </template>
       <template slot="content">
+        <v-toolbar flat color="white">
+          <v-row>
+            <v-col cols="6" class="my-auto">
+              <v-text-field
+                v-model="keyword"
+                :placeholder=" $t('notes.label.filter') "
+                clearable
+                prepend-inner-icon="fa-filter" />
+            </v-col>
+          </v-row>
+        </v-toolbar>
         <v-layout v-if="movePage" column>
           <v-list-item>
             <v-list-item-content>
@@ -95,6 +106,8 @@
               :items="items[0].children"
               :open="openedItems"
               :active="active"
+              :search="keyword"
+              :filter="filter"
               :load-children="fetchNoteChildren"
               class="treeview-item"
               item-key="id"
@@ -165,8 +178,12 @@ export default {
     render: true,
     closeAll: true,
     drawer: false,
+    keyword: null,
   }),
   computed: {
+    filter () {
+      return (item, search, textKey) => item[textKey].indexOf(search) > -1;
+    },
     items() {
       return this.breadcrumbItems;
     },
@@ -277,6 +294,7 @@ export default {
           hasChild: noteChildren.hasChild,
           name: noteChildren.name,
           noteId: noteChildren.noteId,
+          draftNote: noteChildren.draftNote,
           children: []
         });
       } else {
@@ -284,7 +302,8 @@ export default {
           id: noteChildren.path.split('%2F').pop(),
           hasChild: noteChildren.hasChild,
           name: noteChildren.name,
-          noteId: noteChildren.noteId
+          noteId: noteChildren.noteId,
+          draftNote: noteChildren.draftNote,
         });
       }
     },
@@ -331,6 +350,7 @@ export default {
             hasChild: child.hasChild,
             name: child.name,
             noteId: child.noteId,
+            draftNote: child.draftNote,
             children: this.makeNoteChildren(child.children)
           });
         } else {
@@ -338,7 +358,8 @@ export default {
             id: child.path.split('%2F').pop(),
             hasChild: child.hasChild,
             name: child.name,
-            noteId: child.noteId
+            noteId: child.noteId,
+            draftNote: child.draftNote,
           });
         }
       });
