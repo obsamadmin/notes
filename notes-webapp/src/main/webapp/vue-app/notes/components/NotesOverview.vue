@@ -186,7 +186,7 @@ export default {
   },
   computed: {
     noteVersionContent() {
-      return this.noteContent;
+      return this.noteContent && this.targetBlank(this.noteContent);
     },
     lastNoteVersion() {
       if ( this.displayLastVersion ) {
@@ -254,9 +254,9 @@ export default {
     }
   },
   created() {
-    this.$root.$on('open-note-by-id', noteId => {
-      this.noteId = noteId;
-      this.getNoteByName(noteId,'tree');
+    this.$root.$on('open-note-by-name', noteName => {
+      this.noteId = noteName;
+      this.getNoteByName(noteName,'tree');
     });
     this.$root.$on('confirmDeleteNote', () => {
       this.confirmDeleteNote();
@@ -270,8 +270,8 @@ export default {
     this.$root.$on('move-page', (note, newParentNote) => {
       this.moveNotes(note, newParentNote);
     });
-    this.$root.$on('export-notes', (notes) => {
-      this.exportNotes(notes);
+    this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId,spaceDisplayName) => {
+      this.exportNotes(notesSelected,importAll,homeNoteId,spaceDisplayName);
     });
     
   },
@@ -311,8 +311,13 @@ export default {
         });
       });
     },
-    exportNotes(notes){
-      this.$notesService.exportNotes(notes).then((transfer) => {
+    exportNotes(notesSelected,importAll,homeNoteId){
+      let exportChildren =false;
+      if (importAll === true) {
+        exportChildren = true;
+        notesSelected = homeNoteId;
+      }
+      this.$notesService.exportNotes(notesSelected,exportChildren).then((transfer) => {
         return transfer.blob();                 
       }).then((bytes) => {
         const elm = document.createElement('a');  
@@ -445,7 +450,24 @@ export default {
         .finally(() => {
           this.getNoteVersionByNoteId(this.note.id);
         });
-    }
+    },
+    targetBlank: function (content) {
+      const internal = location.host + eXo.env.portal.context;
+      const domParser = new DOMParser();
+      const docElement = domParser.parseFromString(content, 'text/html').documentElement;
+      const links = docElement.getElementsByTagName('a');
+      for (const link of links) {
+        let href = link.href.replace(/(^\w+:|^)\/\//, '');
+        if (href.endsWith('/')) {
+          href = href.slice(0, -1);
+        }
+        if (href !== location.host && !href.startsWith(internal)) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      return docElement.innerHTML;
+    },
   }
 };
 </script>

@@ -62,7 +62,6 @@
         <span>{{ $t('notes.menu.label.exportPdf') }}</span>
       </v-list-item>
       <v-list-item
-        v-if="note.name == defaultPath"
         class="px-2 text-left action-menu-item draftButton"
         @click="$emit('open-treeview-export')">
         <v-icon

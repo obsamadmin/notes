@@ -43,7 +43,20 @@ export function getSeparator(url) {
 }
 
 export function getNoteTree(noteBookType, noteBookOwner, noteId,treeType) {
-  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/wiki/tree/${treeType}?path=${noteBookType}/${noteBookOwner}/${noteId}`, {
+  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/tree/${treeType}?path=${noteBookType}/${noteBookOwner}/${noteId}`, {
+    method: 'GET',
+    credentials: 'include',
+  }).then(resp => {
+    if (!resp || !resp.ok) {
+      throw new Error('Response code indicates a server error', resp);
+    } else {
+      return resp.json();
+    }
+  });
+}
+
+export function getFullNoteTree(noteBookType, noteBookOwner, noteId, withDrafts) {
+  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/tree/full?path=${noteBookType}/${noteBookOwner}/${noteId}&withDrafts=${withDrafts}`, {
     method: 'GET',
     credentials: 'include',
   }).then(resp => {
@@ -216,8 +229,8 @@ export function moveNotes(note,destination) {
 }
 
 
-export function exportNotes(notes) {
-  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/export/${notes}?exportChildren=false`, {
+export function exportNotes(notes,exportChildren) {
+  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/export/${notes}?exportChildren=${exportChildren}`, {
     credentials: 'include',
     method: 'GET',
   }).then((resp) => {
