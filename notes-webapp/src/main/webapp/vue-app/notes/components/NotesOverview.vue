@@ -106,7 +106,8 @@
       @open-treeview="$refs.notesBreadcrumb.open(note.id, 'movePage')"
       @export-pdf="createPDF(note)"
       @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)"
-      @open-import-drawer="$refs.noteImportDrawer.open()" />
+      @open-import-drawer="$refs.noteImportDrawer.open()"
+      @open-treeview-export="$refs.notesBreadcrumb.open(note.id, 'exportNotes')" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />
     <note-history-drawer
@@ -176,7 +177,7 @@ export default {
     note() {
       this.getNoteVersionByNoteId(this.note.id);
       if ( this.note && this.note.breadcrumb && this.note.breadcrumb.length ) {
-        this.note.breadcrumb[0].title = this.$t('note.label.noteHome');
+        this.note.breadcrumb[0].title = this.$t('notes.label.noteHome');
         this.currentNoteBreadcrumb = this.note.breadcrumb;
       }
       this.noteContent = this.note.content;
@@ -188,7 +189,7 @@ export default {
   },
   computed: {
     noteVersionContent() {
-      return this.noteContent;
+      return this.noteContent && this.targetBlank(this.noteContent);
     },
     lastNoteVersion() {
       if ( this.displayLastVersion ) {
@@ -256,9 +257,9 @@ export default {
     }
   },
   created() {
-    this.$root.$on('open-note-by-id', noteId => {
-      this.noteId = noteId;
-      this.getNoteByName(noteId,'tree');
+    this.$root.$on('open-note-by-name', noteName => {
+      this.noteId = noteName;
+      this.getNoteByName(noteName,'tree');
     });
     this.$root.$on('confirmDeleteNote', () => {
       this.confirmDeleteNote();
@@ -271,6 +272,9 @@ export default {
     });
     this.$root.$on('move-page', (note, newParentNote) => {
       this.moveNotes(note, newParentNote);
+    });
+    this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId,spaceDisplayName) => {
+      this.exportNotes(notesSelected,importAll,homeNoteId,spaceDisplayName);
     });
     
   },
@@ -308,6 +312,29 @@ export default {
           type: 'error',
           message: this.$t(`notes.message.${e.message}`)
         });
+      });
+    },
+    exportNotes(notesSelected,importAll,homeNoteId){
+      let exportChildren =false;
+      if (importAll === true) {
+        exportChildren = true;
+        notesSelected = homeNoteId;
+      }
+      this.$notesService.exportNotes(notesSelected,exportChildren).then((transfer) => {
+        return transfer.blob();                 
+      }).then((bytes) => {
+        const elm = document.createElement('a');  
+        elm.href = URL.createObjectURL(bytes);  
+        elm.setAttribute('download', `NotesExport_${Date.now()}`); 
+        elm.click();                             
+        this.$root.$emit('close-note-tree-drawer');
+        this.$root.$emit('show-alert', {type: 'success',message: this.$t('notes.alert.success.label.exported')});
+      }).catch(e=> {
+        console.error('Error when export note page', e);
+        this.$root.$emit('show-alert', {
+          type: 'error',
+          message: this.$t(`notes.message.${e.message}`)
+        });          
       });
     },
     getNoteById(noteId,source) {
@@ -426,7 +453,24 @@ export default {
         .finally(() => {
           this.getNoteVersionByNoteId(this.note.id);
         });
-    }
+    },
+    targetBlank: function (content) {
+      const internal = location.host + eXo.env.portal.context;
+      const domParser = new DOMParser();
+      const docElement = domParser.parseFromString(content, 'text/html').documentElement;
+      const links = docElement.getElementsByTagName('a');
+      for (const link of links) {
+        let href = link.href.replace(/(^\w+:|^)\/\//, '');
+        if (href.endsWith('/')) {
+          href = href.slice(0, -1);
+        }
+        if (href !== location.host && !href.startsWith(internal)) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      return docElement.innerHTML;
+    },
   }
 };
 </script>

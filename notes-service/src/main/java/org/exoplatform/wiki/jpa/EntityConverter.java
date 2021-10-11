@@ -16,6 +16,7 @@ import org.exoplatform.wiki.service.IDType;
 
 import java.io.ByteArrayInputStream;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Utility class to convert JPA entity objects
@@ -371,6 +372,7 @@ public class EntityConverter {
       PageEntity parentPage = draftPageEntity.getParentPage();
       if (parentPage != null) {
         draftPage.setParentPageId(String.valueOf(parentPage.getId()));
+        draftPage.setParentPageName(parentPage.getName());
         if (StringUtils.isEmpty(draftPage.getWikiType()) || StringUtils.isEmpty(draftPage.getWikiOwner())) {
           WikiEntity wiki = parentPage.getWiki();
           draftPage.setWikiType(wiki.getType());
