@@ -276,6 +276,10 @@ export default {
     this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId,spaceDisplayName) => {
       this.exportNotes(notesSelected,importAll,homeNoteId,spaceDisplayName);
     });
+    this.$root.$on('import-notes', () => {
+      this.importNotes();
+    });
+
     
   },
   mounted() {
@@ -335,6 +339,18 @@ export default {
           type: 'error',
           message: this.$t(`notes.message.${e.message}`)
         });          
+      });
+    },
+    importNotes(){
+      this.$notesService.importZipNotes(this.note.id).then(() => {
+        this.$root.$emit('close-note-tree-drawer');
+        this.$root.$emit('show-alert', {type: 'success',message: this.$t('notes.alert.success.label.notes.imported')});
+      }).catch(e => {
+        console.error('Error when import notese', e);
+        this.$root.$emit('show-alert', {
+          type: 'error',
+          message: this.$t(`notes.message.${e.message}`)
+        });
       });
     },
     getNoteById(noteId,source) {

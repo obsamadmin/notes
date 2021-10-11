@@ -228,6 +228,22 @@ export function moveNotes(note,destination) {
   });
 }
 
+export function importZipNotes(noteId) {
+  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/import/${noteId}`, {
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    method: 'POST',
+    credentials: 'include',
+  }).then((resp) => {
+    if (!resp || !resp.ok) {
+        throw new Error('error', resp);
+    } else {
+      return resp;    }
+  });
+}
+
 
 export function exportNotes(notes,exportChildren) {
   return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/export/${notes}?exportChildren=${exportChildren}`, {

@@ -93,7 +93,8 @@
             </template>
           </v-btn>
           <v-btn
-            class="btn btn-primary">
+            class="btn btn-primary"
+            @click="importNotes">
             <template>
               {{ $t('notes.button.import') }}
             </template>
@@ -139,6 +140,10 @@ export default {
     },
     cancel() {
       this.$refs.importNotesDrawer.close();
+    },
+    importNotes(){
+      this.$root.$emit('import-notes');
+      this.cancel();
     },
   }
 };
