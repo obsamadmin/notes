@@ -115,7 +115,7 @@
       @export-pdf="createPDF(note)"
       @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)"
       @open-treeview-export="$refs.notesBreadcrumb.open(note.id, 'exportNotes')" />
-      @open-import-drawer="$refs.noteImportDrawer.open()" />
+    @open-import-drawer="$refs.noteImportDrawer.open()" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />
     <note-history-drawer
@@ -310,6 +310,10 @@ export default {
     this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId) => {
       this.exportNotes(notesSelected,importAll,homeNoteId);
     });
+    this.$root.$on('import-notes', () => {
+      this.importNotes();
+    });
+
     
   },
   mounted() {
@@ -392,6 +396,18 @@ export default {
       }).finally(() => {
         this.$root.$applicationLoaded();
         this.$root.$emit('refresh-treeView-items', this.note);
+      });
+    },
+    importNotes(){
+      this.$notesService.importZipNotes(this.note.id).then(() => {
+        this.$root.$emit('close-note-tree-drawer');
+        this.$root.$emit('show-alert', {type: 'success',message: this.$t('notes.alert.success.label.notes.imported')});
+      }).catch(e => {
+        console.error('Error when import notese', e);
+        this.$root.$emit('show-alert', {
+          type: 'error',
+          message: this.$t(`notes.message.${e.message}`)
+        });
       });
     },
     getNoteByName(noteName, source) {
