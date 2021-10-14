@@ -325,7 +325,7 @@ export default {
         notesSelected = homeNoteId;
       }
       this.$notesService.exportNotes(notesSelected,exportChildren).then((transfer) => {
-        return transfer.blob();                 
+        return transfer.blob();        src/main/webapp/vue-app/notes/components/NoteTreeviewDrawer.vue
       }).then((bytes) => {
         const elm = document.createElement('a');  
         elm.href = URL.createObjectURL(bytes);  
