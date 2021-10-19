@@ -264,7 +264,7 @@ export function importZipNotes(noteId) {
     credentials: 'include',
   }).then((resp) => {
     if (!resp || !resp.ok) {
-        throw new Error('error', resp);
+      throw new Error('error', resp);
     } else {
       return resp;    }
   });

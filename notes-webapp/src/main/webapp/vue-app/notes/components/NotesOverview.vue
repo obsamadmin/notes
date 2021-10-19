@@ -366,7 +366,7 @@ export default {
       }
       const date=this.$dateUtil.formatDateObjectToDisplay(Date.now(), this.dateTimeFormatZip, this.lang);
       this.$notesService.exportNotes(notesSelected,exportChildren).then((transfer) => {
-        return transfer.blob();        src/main/webapp/vue-app/notes/components/NoteTreeviewDrawer.vue
+        return transfer.blob();
       }).then((bytes) => {
         const elm = document.createElement('a');  
         elm.href = URL.createObjectURL(bytes);
