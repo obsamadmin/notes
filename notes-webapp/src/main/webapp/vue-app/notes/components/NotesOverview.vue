@@ -7,7 +7,7 @@
         ref="content">
         <div class="notes-application-header">
           <div class="notes-title d-flex justify-space-between">
-            <span class="title text-color mt-n1">{{ noteTitle }}</span>
+            <span class="title text-color mt-n1">{{ note.title }}</span>
             <div
               id="note-actions-menu"
               v-show="loadData && !hideActions"
@@ -61,27 +61,35 @@
                   class="uiIcon uiTreeviewIcon primary--text me-3"
                   v-bind="attrs"
                   v-on="on" 
-                  @click="$refs.notesBreadcrumb.open(note.id, 'displayNote')"></i>
+                  @click="$refs.notesBreadcrumb.open(note, 'displayNote')"></i>
               </template>
               <span class="caption">{{ $t('notes.label.noteTreeview.tooltip') }}</span>
             </v-tooltip>
             <note-breadcrumb :note-breadcrumb="notebreadcrumb" @open-note="getNoteByName($event, 'breadCrumb')" />
           </div>
           <div class="notes-last-update-info">
-            <span class="note-version border-radius primary px-2 font-weight-bold me-2 caption clickable" @click="$refs.noteVersionsHistoryDrawer.open(noteVersions, note.canManage)">V{{ lastNoteVersion }}</span>
+            <span class="note-version border-radius primary px-2 font-weight-bold me-2 caption clickable" @click="openNoteVersionsHistoryDrawer(noteVersions, note.canManage)">V{{ lastNoteVersion }}</span>
             <span class="caption text-sub-title font-italic">{{ $t('notes.label.LastModifiedBy', {0: lastNoteUpdatedBy, 1: displayedDate}) }}</span>
           </div>
         </div>
         <v-divider class="my-4" />
         <div
-          v-if="note.content"
+          v-if=" note.content || (noteChildren && noteChildren[0] && !noteChildren[0].hasChild)"
           class="notes-application-content text-color"
-          v-html="noteVersionContent">
+          v-html="isDraft ? note.content : noteVersionContent">
         </div>
         <div v-else class="notes-application-content">
-          <p class="body-2 font-italic">
-            {{ $t('notes.label.no-content') }}
-          </p>
+          <v-treeview
+            v-if="noteChildren && noteChildren[0]"
+            open-all
+            dense
+            :items="noteChildren[0].children">
+            <template v-slot:label="{ item }">
+              <v-list-item-title @click="openNoteChild(item)" class="body-2 clickable primary--text">
+                <span>{{ item.name }}</span>
+              </v-list-item-title>
+            </template>
+          </v-treeview>
         </div>
       </div>
       <div v-else class="note-not-found-wrapper text-center mt-6">
@@ -153,7 +161,13 @@ export default {
         hour: '2-digit',
         minute: '2-digit',
       },
+      dateTimeFormatZip: {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      },
       confirmMessage: '',
+      spaceDisplayName: eXo.env.portal.spaceDisplayName,
       noteBookType: eXo.env.portal.spaceName ? 'group' : 'user',
       noteBookOwner: eXo.env.portal.spaceGroup ? `/spaces/${eXo.env.portal.spaceGroup}` : eXo.env.portal.profileOwner,
       noteNotFountImage: '/notes/skin/images/notes_not_found.png',
@@ -170,26 +184,37 @@ export default {
       noteVersions: [],
       actualVersion: {},
       noteContent: '',
-      displayLastVersion: true
+      displayLastVersion: true,
+      noteChildren: [],
+      isDraft: false,
     };
   },
   watch: {
     note() {
-      this.getNoteVersionByNoteId(this.note.id);
+      if (!this.note.draftPage) {
+        this.getNoteVersionByNoteId(this.note.id);
+      }
       if ( this.note && this.note.breadcrumb && this.note.breadcrumb.length ) {
         this.note.breadcrumb[0].title = this.$t('notes.label.noteHome');
         this.currentNoteBreadcrumb = this.note.breadcrumb;
       }
       this.noteContent = this.note.content;
+      this.retrieveNoteTreeById();
     },
     actualVersion() {
-      this.noteContent = this.actualVersion.content;
-      this.displayLastVersion = false;
+      if (!this.isDraft) {
+        this.noteContent = this.actualVersion.content;
+        this.displayLastVersion = false;
+      }
     }
   },
   computed: {
     noteVersionContent() {
-      return this.noteContent && this.targetBlank(this.noteContent);
+      if ( this.note.content ) {
+        return this.noteContent && this.targetBlank(this.noteContent);
+      } else {
+        return this.$t('notes.label.no-content');
+      }
     },
     lastNoteVersion() {
       if ( this.displayLastVersion ) {
@@ -199,17 +224,25 @@ export default {
       }
     },
     lastNoteUpdatedBy() {
-      if ( this.displayLastVersion ) {
-        return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].authorFullName;
+      if (this.isDraft) {
+        return this.note.authorFullName;
       } else {
-        return this.actualVersion.authorFullName;
+        if (this.displayLastVersion) {
+          return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].authorFullName;
+        } else {
+          return this.actualVersion.authorFullName;
+        }
       }
     },
     displayedDate() {
-      if ( this.displayLastVersion ) {
-        return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].updatedDate.time && this.$dateUtil.formatDateObjectToDisplay(new Date(this.noteVersions[0].updatedDate.time), this.dateTimeFormat, this.lang) || '';
+      if (this.isDraft) {
+        return this.$dateUtil.formatDateObjectToDisplay(new Date(this.note.updatedDate.time), this.dateTimeFormat, this.lang) || '';
       } else {
-        return this.$dateUtil.formatDateObjectToDisplay(new Date(this.actualVersion.updatedDate.time), this.dateTimeFormat, this.lang) || '';
+        if (this.displayLastVersion) {
+          return this.noteVersions && this.noteVersions[0] && this.noteVersions[0].updatedDate.time && this.$dateUtil.formatDateObjectToDisplay(new Date(this.noteVersions[0].updatedDate.time), this.dateTimeFormat, this.lang) || '';
+        } else {
+          return this.$dateUtil.formatDateObjectToDisplay(new Date(this.actualVersion.updatedDate.time), this.dateTimeFormat, this.lang) || '';
+        }
       }
     },
     isMobile() {
@@ -221,13 +254,6 @@ export default {
     },
     notebreadcrumb() {
       return this.currentNoteBreadcrumb;
-    },
-    noteTitle() {
-      if ( this.noteId === 1) {
-        return this.$t('notes.label.noteHome');
-      } else {
-        return this.note.title;
-      }
     },
     notesPageName() {
       if (this.currentPath.endsWith(eXo.env.portal.selectedNodeUri)||this.currentPath.endsWith(`${eXo.env.portal.selectedNodeUri}/`)){
@@ -243,9 +269,10 @@ export default {
       }
     },
     noteId() {
-      const nId = this.currentPath.split(`${eXo.env.portal.selectedNodeUri}/`)[1];
-      if (!isNaN(nId)) {
-        return nId;
+      const pathParams = this.currentPath.split('/');
+      const noteId = this.isDraft ? this.currentPath.split('/')[pathParams.length - 2] : this.currentPath.split('/')[pathParams.length - 1];
+      if (!isNaN(noteId)) {
+        return noteId;
       } else {
         return 0;
       }
@@ -257,9 +284,16 @@ export default {
     }
   },
   created() {
-    this.$root.$on('open-note-by-name', noteName => {
-      this.noteId = noteName;
-      this.getNoteByName(noteName,'tree');
+    if (this.currentPath.endsWith('draft')) {
+      this.isDraft = true;
+    }
+    this.$root.$on('open-note-by-name', (noteName, isDraft) => {
+      if (!isDraft) {
+        this.noteId = noteName;
+        this.getNoteByName(noteName,'tree');
+      } else {
+        this.getDraftNote(noteName);
+      }
     });
     this.$root.$on('confirmDeleteNote', () => {
       this.confirmDeleteNote();
@@ -273,8 +307,8 @@ export default {
     this.$root.$on('move-page', (note, newParentNote) => {
       this.moveNotes(note, newParentNote);
     });
-    this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId,spaceDisplayName) => {
-      this.exportNotes(notesSelected,importAll,homeNoteId,spaceDisplayName);
+    this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId) => {
+      this.exportNotes(notesSelected,importAll,homeNoteId);
     });
     this.$root.$on('import-notes', () => {
       this.importNotes();
@@ -284,18 +318,24 @@ export default {
   },
   mounted() {
     if (this.noteId) {
-      this.getNoteById(this.noteId);
+      if (this.isDraft) {
+        this.getDraftNote(this.noteId);
+      } else {
+        this.getNoteById(this.noteId);
+      }
     } else {
       this.getNoteByName(this.notesPageName);
     }
     this.currentNoteBreadcrumb = this.note.breadcrumb;
   },
   methods: {
-    addNote(){
-      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?spaceId=${eXo.env.portal.spaceId}&parentNoteId=${this.note.id}&appName=${this.appName}`,'_blank');
+    addNote() {
+      if (!this.isDraft) {
+        window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?spaceId=${eXo.env.portal.spaceId}&parentNoteId=${this.note.id}&appName=${this.appName}`, '_blank');
+      }
     },
-    editNote(){
-      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.note.id}&parentNoteId=${this.note.parentPageId ? this.note.parentPageId : this.note.id}&appName=${this.appName}`,'_blank');
+    editNote() {
+      window.open(`${eXo.env.portal.context}/${eXo.env.portal.portalName}/notes-editor?noteId=${this.note.id}&parentNoteId=${this.note.parentPageId ? this.note.parentPageId : this.note.id}&appName=${this.appName}&isDraft=${this.isDraft}`, '_blank');
     },
     deleteNote(){
       this.$notesService.deleteNotes(this.note).then(() => {
@@ -324,12 +364,13 @@ export default {
         exportChildren = true;
         notesSelected = homeNoteId;
       }
+      const date=this.$dateUtil.formatDateObjectToDisplay(Date.now(), this.dateTimeFormatZip, this.lang);
       this.$notesService.exportNotes(notesSelected,exportChildren).then((transfer) => {
         return transfer.blob();        src/main/webapp/vue-app/notes/components/NoteTreeviewDrawer.vue
       }).then((bytes) => {
         const elm = document.createElement('a');  
-        elm.href = URL.createObjectURL(bytes);  
-        elm.setAttribute('download', `NotesExport_${Date.now()}`); 
+        elm.href = URL.createObjectURL(bytes);
+        elm.setAttribute('download', `${date}_notes_${this.spaceDisplayName}`);
         elm.click();                             
         this.$root.$emit('close-note-tree-drawer');
         this.$root.$emit('show-alert', {type: 'success',message: this.$t('notes.alert.success.label.exported')});
@@ -353,21 +394,10 @@ export default {
         });
       });
     },
-    getNoteById(noteId,source) {
-      return this.$notesService.getNoteById(noteId,source,this.noteBookType, this.noteBookOwner).then(data => {
-        const note = data || [];
-        this.getNoteByName(note.name, source);
-      }).catch(e => {
-        console.error('Error when getting note', e);
-        this.existingNote = false;
-      }).finally(() => {
-        this.$root.$applicationLoaded();
-        this.$root.$emit('refresh-treeview-items',this.note.id);
-      });
-    },
-    getNoteByName(noteName,source) {
-      return this.$notesService.getNotes(this.noteBookType, this.noteBookOwner, noteName,source).then(data => {
-        this.note = data || [];
+    getNoteById(noteId, source) {
+      return this.$notesService.getNoteById(noteId, source, this.noteBookType, this.noteBookOwner).then(data => {
+        this.note = {};
+        this.note = data || {};
         this.loadData = true;
         notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.split(this.appName)[0]}${this.appName}/${this.note.id}`;
         window.history.pushState('notes', '', notesConstants.PORTAL_BASE_URL);
@@ -377,7 +407,39 @@ export default {
         this.existingNote = false;
       }).finally(() => {
         this.$root.$applicationLoaded();
-        this.$root.$emit('refresh-treeview-items',this.note.id);
+        this.$root.$emit('refresh-treeView-items', this.note);
+      });
+    },
+    getNoteByName(noteName, source) {
+      return this.$notesService.getNotes(this.noteBookType, this.noteBookOwner, noteName, source).then(data => {
+        this.note = data || {};
+        this.loadData = true;
+        notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.split(this.appName)[0]}${this.appName}/${this.note.id}`;
+        window.history.pushState('notes', '', notesConstants.PORTAL_BASE_URL);
+        return this.$nextTick();
+      }).catch(e => {
+        console.error('Error when getting note', e);
+        this.existingNote = false;
+      }).finally(() => {
+        this.$root.$applicationLoaded();
+        this.$root.$emit('refresh-treeView-items', this.note);
+      });
+    },
+    getDraftNote(noteId) {
+      return this.$notesService.getDraftNoteById(noteId).then(data => {
+        this.note = {};
+        this.note = data || {};
+        this.isDraft = true;
+        this.loadData = true;
+        notesConstants.PORTAL_BASE_URL = `${notesConstants.PORTAL_BASE_URL.split(this.appName)[0]}${this.appName}/${this.note.id}/draft`;
+        window.history.pushState('notes', '', notesConstants.PORTAL_BASE_URL);
+        return this.$nextTick();
+      }).catch(e => {
+        console.error('Error when getting note', e);
+        this.existingNote = false;
+      }).finally(() => {
+        this.$root.$applicationLoaded();
+        this.$root.$emit('refresh-treeView-items', this.note);
       });
     },
     confirmDeleteNote: function () {
@@ -470,6 +532,19 @@ export default {
           this.getNoteVersionByNoteId(this.note.id);
         });
     },
+    retrieveNoteTreeById() {
+      this.note.wikiOwner = this.note.wikiOwner.substring(1);
+      this.$notesService.getFullNoteTree(this.note.wikiType, this.note.wikiOwner , this.note.name).then(data => {
+        if (data && data.jsonList.length) {
+          const allnotesTreeview = data.jsonList;
+          this.noteChildren = allnotesTreeview.filter(note => note.name === this.note.name);
+        }
+      });
+    },
+    openNoteChild(item) {
+      const noteName = item.path.split('%2F').pop();
+      this.$root.$emit('open-note-by-name', noteName);
+    },
     targetBlank: function (content) {
       const internal = location.host + eXo.env.portal.context;
       const domParser = new DOMParser();
@@ -486,6 +561,11 @@ export default {
         }
       }
       return docElement.innerHTML;
+    },
+    openNoteVersionsHistoryDrawer() {
+      if (!this.isDraft) {
+        this.$refs.noteVersionsHistoryDrawer.open(this.noteVersions, this.note.canManage);
+      }
     },
   }
 };

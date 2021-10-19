@@ -2,9 +2,14 @@
   <v-app class="notesEditor">
     <v-alert
       v-model="alert"
-      :type="type"
+      :type="alertType"
+      :icon="alertType === 'warning' ? 'mdi-alert-circle' : ''"
       dismissible>
       {{ message }}
+      <a 
+        v-if="alertType === 'warning' && note.draftPage" 
+        class="dropDraftLink"
+        @click="dropDraft">{{ $t('notes.label.drop.draft') }}</a>
     </v-alert>
     <div
       id="notesEditor"
@@ -21,7 +26,7 @@
               <button
                 id="notesUpdateAndPost"
                 class="btn btn-primary primary px-2 py-0"
-                @click="postNote(false)">
+                @click.once="postNote(false)">
                 {{ publishButtonText }}
                 <v-icon
                   id="notesPublichAndPost"
@@ -98,6 +103,14 @@ export default {
   },
   data() {
     return {
+      lang: eXo.env.portal.language,
+      dateTimeFormat: {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      },
       note: {
         id: '',
         title: '',
@@ -111,7 +124,7 @@ export default {
         parentPageId: '',
       },
       alert: false,
-      type: '',
+      alertType: '',
       message: '',
       noteId: '',
       parentPageId: '',
@@ -181,7 +194,12 @@ export default {
     }
     if (urlParams.has('noteId')) {
       this.noteId = urlParams.get('noteId');
-      this.getNote(this.noteId);
+      const isDraft = urlParams.has('isDraft') && urlParams.get('isDraft') === 'true';
+      if (isDraft) {
+        this.getDraftNote(this.noteId);
+      } else {
+        this.getNote(this.noteId);
+      }
     }
     if (urlParams.has('parentNoteId')) {
       this.parentPageId = urlParams.get('parentNoteId');
@@ -257,6 +275,11 @@ export default {
       if (this.postingNote) {
         return;
       }
+      // close draft dropping related alert
+      if (this.alertType === 'warning' && this.note.draftPage && this.alert) {
+        this.alert = false;
+      }
+      
       clearTimeout(this.saveDraft);
       this.saveDraft = setTimeout(() => {
         this.savingDraft = true;
@@ -267,21 +290,53 @@ export default {
       }, this.autoSaveDelay);
     },
     getNote(id) {
-      return this.$notesService.getNoteById(id).then(data => {
-        if (data) {
-          this.note = data;
-          this.actualNote = {
-            id: this.note.id,
-            name: this.note.name,
-            title: this.note.title,
-            content: this.note.content,
-            author: this.note.author,
-            owner: this.note.owner,
-            breadcrumb: this.note.breadcrumb,
-            toBePublished: this.note.toBePublished,
+      return this.$notesService.getLatestDraftOfPage(id).then(latestDraft => {
+        // check if page has a draft
+        latestDraft = Object.keys(latestDraft).length !== 0 ? latestDraft : null;
+        if (latestDraft) {
+          this.fillNote(latestDraft);
+          const messageObject = {
+            type: 'warning',
+            message: `${this.$t('notes.alert.warning.label.draft.drop')} ${this.$dateUtil.formatDateObjectToDisplay(new Date(this.note.updatedDate.time), this.dateTimeFormat, this.lang)},`
           };
+          this.displayMessage(messageObject, true);
+          this.initActualNoteDone = true;
+        } else {
+          this.$notesService.getNoteById(id).then(data => {
+            this.fillNote(data);
+            this.initActualNoteDone = true;
+          });
         }
-      }).finally(() => this.initActualNoteDone = true);
+      });
+    },
+    getDraftNote(id) {
+      return this.$notesService.getDraftNoteById(id).then(data => {
+        this.fillNote(data);
+      }).finally(() => {
+        const messageObject = {
+          type: 'warning',
+          message: `${this.$t('notes.alert.warning.label.draft.drop')} ${this.$dateUtil.formatDateObjectToDisplay(new Date(this.note.updatedDate.time), this.dateTimeFormat, this.lang)},  `
+        };
+        this.displayMessage(messageObject, true);
+        this.initActualNoteDone = true;
+      });
+    },
+    fillNote(data) {
+      this.initActualNoteDone = false;
+      if (data) {
+        this.note = data;
+        CKEDITOR.instances['notesContent'].setData(data.content);
+        this.actualNote = {
+          id: this.note.id,
+          name: this.note.name,
+          title: this.note.title,
+          content: this.note.content,
+          author: this.note.author,
+          owner: this.note.owner,
+          breadcrumb: this.note.breadcrumb,
+          toBePublished: this.note.toBePublished,
+        };
+      }
     },
     postNote(toPublish) {
       this.postingNote = true;
@@ -573,18 +628,46 @@ export default {
         return true;
       }
     },
-    displayMessage(message) {
-      this.message=message.message;
-      this.type=message.type;
+    displayMessage(message, keepAlert) {
+      this.message = message.message;
+      this.alertType = message.type;
       this.alert = true;
-      window.setTimeout(() => this.alert = false, 5000);
+      if (!keepAlert) {
+        window.setTimeout(() => this.alert = false, 5000);
+      }
     },
-    displayFormTitle: function() {
+    displayFormTitle() {
       if (this.noteId) {
         this.noteFormTitle = this.$t('notes.edit.editNotes');
       } else {
         return this.$spaceService.getSpaceById(this.spaceId).then(space => {
           this.noteFormTitle = this.$t('notes.composer.createNotes').replace('{0}', space.displayName);
+        });
+      }
+    },
+    dropDraft() {
+      if (this.note.draftPage && this.note.id) {
+        const targetPageId = this.note.targetPageId;
+        this.removeLocalStorageCurrentDraft();
+        this.$notesService.deleteDraftNote(this.note).then(() => {
+          this.draftSavingStatus = '';
+          //re-initialize data
+          if (targetPageId) {
+            if (this.alertType === 'warning') {
+              this.alert = false;
+            }
+            this.getNote(targetPageId);
+          } else {
+            const parentNote = {
+              id: this.note.parentPageId,
+              wikiId: this.note.wikiId,
+              wikiOwner: this.note.wikiOwner,
+              wikiType: this.note.wikiType,
+            };
+            window.location.href = this.$notesService.getPathByNoteOwner(parentNote, this.appName).replace(/ /g, '_');
+          }
+        }).catch(e => {
+          console.error('Error when deleting draft note', e);
         });
       }
     },
@@ -619,7 +702,7 @@ export default {
             window.location.href = notePath;
           }
         }).catch(e => {
-          console.error('Error when deleting note', e);
+          console.error('Error when deleting draft note', e);
         });
       }
     },

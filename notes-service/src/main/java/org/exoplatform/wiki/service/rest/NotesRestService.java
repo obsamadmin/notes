@@ -16,28 +16,13 @@
  */
 package org.exoplatform.wiki.service.rest;
 
-import java.io.*;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
-
-import javax.annotation.security.RolesAllowed;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.*;
-import javax.ws.rs.core.CacheControl;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.annotations.*;
+import io.swagger.jaxrs.PATCH;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.NumberUtils;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.apache.commons.lang3.StringUtils;
 import org.exoplatform.common.http.HTTPStatus;
 import org.exoplatform.commons.utils.HTMLSanitizer;
@@ -64,18 +49,22 @@ import org.exoplatform.wiki.tree.TreeNode.TREETYPE;
 import org.exoplatform.wiki.tree.WikiTreeNode;
 import org.exoplatform.wiki.tree.utils.TreeUtils;
 import org.exoplatform.wiki.utils.Utils;
+import org.json.JSONObject;
 
-import io.swagger.annotations.*;
-import io.swagger.jaxrs.PATCH;
 import javax.annotation.security.RolesAllowed;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.*;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 @Path("/notes")
 @Api(value = "/notes", description = "Managing notes")
@@ -187,7 +176,7 @@ public class NotesRestService implements ResourceContainer {
         }
       }
       note.setContent(HTMLSanitizer.sanitize(note.getContent()));
-      note.setBreadcrumb(noteService.getBreadcumb(noteBookType, noteBookOwner, noteId));
+      note.setBreadcrumb(noteService.getBreadCrumb(noteBookType, noteBookOwner, noteId, false));
       return Response.ok(note).build();
     } catch (IllegalAccessException e) {
       log.error("User does not have view permissions on the note {}:{}:{}", noteBookType, noteBookOwner, noteId, e);
@@ -223,13 +212,68 @@ public class NotesRestService implements ResourceContainer {
         return Response.status(Response.Status.NOT_FOUND).build();
       }
       note.setContent(HTMLSanitizer.sanitize(note.getContent()));
-      note.setBreadcrumb(noteService.getBreadcumb(note.getWikiType(), note.getWikiOwner(), note.getName()));
+      note.setBreadcrumb(noteService.getBreadCrumb(note.getWikiType(), note.getWikiOwner(), note.getName(), false));
       return Response.ok(note).build();
     } catch (IllegalAccessException e) {
       log.error("User does not have view permissions on the note {}", noteId, e);
       return Response.status(Response.Status.NOT_FOUND).build();
     } catch (Exception e) {
       log.error("Can't get note {}", noteId, e);
+      return Response.serverError().entity(e.getMessage()).build();
+    }
+  }
+
+  @GET
+  @Path("/draftNote/{noteId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("users")
+  @ApiOperation(value = "Get draft note by id", httpMethod = "GET", response = Response.class, notes = "This returns the draft note if the authenticated user is the author of the draft.")
+  @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
+      @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+      @ApiResponse(code = 404, message = "Resource not found") })
+  public Response getDraftNoteById(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId) {
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      String currentUserId = identity.getUserId();
+      DraftPage draftNote = noteService.getDraftNoteById(noteId, currentUserId);
+      if (draftNote == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      Page parentPage = noteService.getNoteById(draftNote.getParentPageId(), identity);
+      if (parentPage == null) {
+        return Response.status(Response.Status.NOT_FOUND).build();
+      }
+      draftNote.setContent(HTMLSanitizer.sanitize(draftNote.getContent()));
+      draftNote.setBreadcrumb(noteService.getBreadCrumb(parentPage.getWikiType(), parentPage.getWikiOwner(), draftNote.getId(), true));
+      
+      return Response.ok(draftNote).build();
+    } catch (Exception e) {
+      log.error("Can't get draft note {}", noteId, e);
+      return Response.serverError().entity(e.getMessage()).build();
+    }
+  }
+
+  @GET
+  @Path("/latestDraftNote/{noteId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @RolesAllowed("users")
+  @ApiOperation(value = "Get latest draft note of page", httpMethod = "GET", response = Response.class, notes = "This returns the latest draft of the note if the authenticated user is the author of the draft.")
+  @ApiResponses(value = { @ApiResponse(code = 200, message = "Request fulfilled"),
+      @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+      @ApiResponse(code = 404, message = "Resource not found") })
+  public Response getLatestDraftOfPage(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId) {
+    try {
+      Identity identity = ConversationState.getCurrent().getIdentity();
+      String currentUserId = identity.getUserId();
+      Page targetPage = noteService.getNoteById(noteId);
+      if (targetPage == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      DraftPage draftNote = noteService.getLatestDraftOfPage(targetPage, currentUserId);
+
+      return Response.ok(draftNote != null ? draftNote : JSONObject.NULL).build();
+    } catch (Exception e) {
+      log.error("Can't get draft note {}", noteId, e);
       return Response.serverError().entity(e.getMessage()).build();
     }
   }
@@ -497,8 +541,8 @@ public class NotesRestService implements ResourceContainer {
         return Response.status(Response.Status.CONFLICT).entity(NOTE_NAME_EXISTS).build();
       }
       note_.setToBePublished(note.isToBePublished());
+      String newNoteName = TitleResolver.getId(note.getTitle(), false);
       if (!note_.getTitle().equals(note.getTitle()) && !note_.getContent().equals(note.getContent())) {
-        String newNoteName = TitleResolver.getId(note.getTitle(), false);
         note_.setTitle(note.getTitle());
         note_.setContent(note.getContent());
         if (!org.exoplatform.wiki.utils.WikiConstants.WIKI_HOME_NAME.equals(note.getName())
@@ -513,7 +557,6 @@ public class NotesRestService implements ResourceContainer {
           noteService.removeDraftOfNote(noteParams);
         }
       } else if (!note_.getTitle().equals(note.getTitle())) {
-        String newNoteName = TitleResolver.getId(note.getTitle(), false);
         if (!org.exoplatform.wiki.utils.WikiConstants.WIKI_HOME_NAME.equals(note.getName())
             && !note.getName().equals(newNoteName)) {
           noteService.renameNote(note_.getWikiType(), note_.getWikiOwner(), note_.getName(), newNoteName, note.getTitle());
@@ -530,6 +573,10 @@ public class NotesRestService implements ResourceContainer {
         note_.setContent(note.getContent());
         note_ = noteService.updateNote(note_, PageUpdateType.EDIT_PAGE_CONTENT, identity);
         noteService.createVersionOfNote(note_, identity.getUserId());
+        if (!"__anonim".equals(identity.getUserId())) {
+          WikiPageParams noteParams = new WikiPageParams(note_.getWikiType(), note_.getWikiOwner(), newNoteName);
+          noteService.removeDraftOfNote(noteParams);
+        }
       }
       return Response.ok(note_, MediaType.APPLICATION_JSON).cacheControl(cc).build();
     } catch (IllegalAccessException e) {
@@ -623,11 +670,40 @@ public class NotesRestService implements ResourceContainer {
       if (note == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
+      // remove draft note
+      if (!"__anonim".equals(identity.getUserId())) {
+        WikiPageParams noteParams = new WikiPageParams(note.getWikiType(), note.getWikiOwner(), noteName);
+        noteService.removeDraftOfNote(noteParams);
+      }
       noteService.deleteNote(note.getWikiType(), note.getWikiOwner(), noteName, identity);
       return Response.ok().build();
     } catch (IllegalAccessException e) {
       log.error("User does not have delete permissions on the note {}", noteId, e);
       return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (Exception ex) {
+      log.warn("Failed to perform Delete of noteBook note {}", noteId, ex);
+      return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
+    }
+  }
+
+  @DELETE
+  @Path("/draftNote/{noteId}")
+  @RolesAllowed("users")
+  @ApiOperation(value = "Delete note by note's params", httpMethod = "PUT", response = Response.class, notes = "This delets the note if the authenticated user has EDIT permissions.")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Request fulfilled"),
+          @ApiResponse(code = 400, message = "Invalid query input"), @ApiResponse(code = 403, message = "Unauthorized operation"),
+          @ApiResponse(code = 404, message = "Resource not found")})
+  public Response deleteDraftNote(@ApiParam(value = "Note id", required = true) @PathParam("noteId") String noteId) {
+
+    try {
+      String currentUserId = ConversationState.getCurrent().getIdentity().getUserId();
+      DraftPage draftNote = noteService.getDraftNoteById(noteId, currentUserId);
+      String draftNoteName = draftNote.getName();
+      if (draftNote == null) {
+        return Response.status(Response.Status.BAD_REQUEST).build();
+      }
+      noteService.removeDraft(draftNoteName);
+      return Response.ok().build();
     } catch (Exception ex) {
       log.warn("Failed to perform Delete of noteBook note {}", noteId, ex);
       return Response.status(HTTPStatus.INTERNAL_ERROR).cacheControl(cc).build();
@@ -931,14 +1007,14 @@ public class NotesRestService implements ResourceContainer {
 
       context.put(TreeNode.SELECTED_PAGE, note);
       context.put(TreeNode.CAN_EDIT, null);
-      context.put(TreeNode.SHOW_EXCERPT, null)
-      ;
+      context.put(TreeNode.SHOW_EXCERPT, null);
       Deque<WikiPageParams> stk = Utils.getStackParams(note);
       context.put(TreeNode.STACK_PARAMS, stk);
 
       List<JsonNodeData> finalTree = new ArrayList<>();
       responseData = getJsonTree(noteParam, context);
       JsonNodeData rootNodeData = responseData.get(0);
+      rootNodeData.setHasDraftDescendant(true);
       finalTree.add(rootNodeData);
       context.put(TreeNode.DEPTH, "1");
 
@@ -967,34 +1043,64 @@ public class NotesRestService implements ResourceContainer {
 
       } while (!children.isEmpty());
 
-      // from the bottom
-      List<JsonNodeData> bottomChildren = withDrafts ? finalTree.stream().filter(JsonNodeData::isDraftPage).collect(Collectors.toList()) :
+      // from the bottom children nodes
+      List<JsonNodeData> bottomChildren = Boolean.TRUE.equals(withDrafts) ? finalTree.stream().filter(JsonNodeData::isDraftPage).collect(Collectors.toList()) :
               finalTree.stream().filter(jsonNodeData -> !jsonNodeData.isHasChild()).collect(Collectors.toList());
 
+      // prepare draft note nodes tree
+      if (Boolean.TRUE.equals(withDrafts)) {
+        for (JsonNodeData child : bottomChildren) {
+          JsonNodeData parent;
+          do {
+            parent = null;
+            String parentId = child.getParentPageId();
+            Optional<JsonNodeData> parentOptional = finalTree.stream().filter(jsonNodeData -> StringUtils.equals(jsonNodeData.getNoteId(), parentId)).findFirst();
+            if (parentOptional.isPresent()) {
+              parent = parentOptional.get();
+              parent.setHasDraftDescendant(true);
+              int index = finalTree.indexOf(parent);
+              finalTree.set(index, parent);
+            }
+            child = parent;
+                    
+          } while (parent != null);
+        }
+        finalTree = finalTree.stream().filter(jsonNodeData -> jsonNodeData.isDraftPage() || Boolean.TRUE.equals(jsonNodeData.isHasDraftDescendant())).collect(Collectors.toList());
+      }
       while (bottomChildren.size() > 1 || (bottomChildren.size() == 1 && bottomChildren.get(0).getParentPageId() != null)) {
         for (JsonNodeData bottomChild : bottomChildren) {
           String parentPageId = bottomChild.getParentPageId();
           Optional<JsonNodeData> parentOptional = finalTree.stream().filter(jsonNodeData -> StringUtils.equals(jsonNodeData.getNoteId(), parentPageId)).findFirst();
           if (parentOptional.isPresent()) {
             JsonNodeData parent = parentOptional.get();
-            children = parent.getChildren();
-            children.remove(bottomChild);
-            children.add(bottomChild);
-            if (withDrafts) {
-              children = children.stream().filter(jsonNodeData -> jsonNodeData.isDraftPage() || !jsonNodeData.getChildren().isEmpty()).collect(Collectors.toList());
-            }
-            parent.setChildren(children);
+            
+            if (!Boolean.TRUE.equals(withDrafts) || Boolean.TRUE.equals(parent.isHasDraftDescendant())) {
+              children = parent.getChildren();
+              children.remove(bottomChild);
+              
+              if (Boolean.TRUE.equals(withDrafts)) {
+                children = children.stream().filter(jsonNodeData -> jsonNodeData.isDraftPage() || Boolean.TRUE.equals(jsonNodeData.isHasDraftDescendant())).collect(Collectors.toList());
+              }
+              
+            if (!Boolean.TRUE.equals(withDrafts) || bottomChild.isDraftPage() || Boolean.TRUE.equals(bottomChild.isHasDraftDescendant())) {
+                children.add(bottomChild);
+              }
+              parent.setChildren(children);
 
-            // update final tree
-            if (finalTree.contains(parent)) {
-              int index = finalTree.indexOf(parent);
-              finalTree.set(index, parent);
-            }
-            if (parents.contains(parent)) {
-              int index = parents.indexOf(parent);
-              parents.set(index, parent);
-            } else {
-              parents.add(parent);
+              // update final tree
+              if (finalTree.contains(parent)) {
+                int index = finalTree.indexOf(parent);
+                finalTree.set(index, parent);
+              }
+
+              // add node to parents
+              if (parents.contains(parent)) {
+                int index = parents.indexOf(parent);
+                parents.set(index, parent);
+              } else {
+                parents.add(parent);
+              }
+
             }
           }
         }

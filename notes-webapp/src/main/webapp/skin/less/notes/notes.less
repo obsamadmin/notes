@@ -70,6 +70,14 @@
 }
 
 .notesEditor {
+  .v-alert__content {
+    padding-right: 10px !important;
+
+    .dropDraftLink {
+      text-decoration: underline;
+    }
+  }
+  
   .customTableDrawer {
     z-index: 99999 !important;
 
@@ -382,8 +390,14 @@
     .search {
       margin: 0!important;
       padding: 0!important;
+      .mdi-close {
+        font-size: 17px;
+      }
     }
     .filter {
+      .btn-group, .btn.dropdown-toggle {
+        width: inherit;
+      }
       .btn.dropdown-toggle {
         border: 1px solid @greyColorDefault !important;
       }
@@ -435,7 +449,7 @@
           }
 
           .v-list-item__title {
-            span {
+            a {
               font-weight: bold;
               color: @primaryColor!important;
             }

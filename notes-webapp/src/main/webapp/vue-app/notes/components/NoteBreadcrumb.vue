@@ -4,7 +4,7 @@
       <div
         v-for="(note, index) in noteBreadcrumb"
         :key="index"
-        :class="noteBreadcrumb.length === 1 && 'single-path-element' || ''"
+        :class="noteBreadcrumb && noteBreadcrumb.length === 1 && 'single-path-element' || ''"
         class="notes-tree-item d-flex text-truncate"
         :style="`max-width: ${100 / (noteBreadcrumb.length)}%`">
         <v-tooltip max-width="300" bottom>
@@ -22,16 +22,16 @@
       </div>
     </div>
     <div v-else class="notes-tree-items notes-long-path d-flex align-center">
-      <div class="notes-tree-item long-path-first-item d-flex text-truncate">
+      <div v-if="noteBreadcrumb && noteBreadcrumb.length" class="notes-tree-item long-path-first-item d-flex text-truncate">
         <v-tooltip max-width="300" bottom>
           <template v-slot:activator="{ on, attrs }">
             <a
               class="caption text-color text-truncate path-clickable breadCrumb-link"
               v-bind="attrs"
               v-on="on"
-              @click="$emit('open-note',noteBreadcrumb[0].id)">{{ noteBreadcrumb[0].title }}</a>
+              @click="$emit('open-note',noteBreadcrumb[0].id)">{{ noteBreadcrumb && noteBreadcrumb.length && noteBreadcrumb[0].title }}</a>
           </template>
-          <span class="caption">{{ noteBreadcrumb[0].title }}</span>
+          <span class="caption">{{ noteBreadcrumb && noteBreadcrumb.length && noteBreadcrumb[0].title }}</span>
         </v-tooltip>
         <v-icon size="18">mdi-chevron-right</v-icon>
       </div>
@@ -54,7 +54,7 @@
         </v-tooltip>
         <v-icon class="clickable" size="18">mdi-chevron-right</v-icon>
       </div>
-      <div class="notes-tree-item long-path-third-item d-flex text-truncate">
+      <div v-if="noteBreadcrumb && noteBreadcrumb.length" class="notes-tree-item long-path-third-item d-flex text-truncate">
         <v-tooltip max-width="300" bottom>
           <template v-slot:activator="{ on, attrs }">
             <a
@@ -67,7 +67,7 @@
         </v-tooltip>
         <v-icon size="18">mdi-chevron-right</v-icon>
       </div>
-      <div class="notes-tree-item d-flex text-truncate">
+      <div v-if="noteBreadcrumb && noteBreadcrumb.length" class="notes-tree-item d-flex text-truncate">
         <v-tooltip max-width="300" bottom>
           <template v-slot:activator="{ on, attrs }">
             <a
@@ -87,7 +87,7 @@ export default {
   props: {
     noteBreadcrumb: {
       type: Array,
-      default: () => null
+      default: () => []
     }
   },
 };
