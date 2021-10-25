@@ -7,7 +7,7 @@
         ref="content">
         <div class="notes-application-header">
           <div class="notes-title d-flex justify-space-between pb-4">
-            <span ref="noteTitle" class="title text-color mt-n1">{{ $t('note.label.home') }}  {{ spaceDisplayName }}</span>
+            <span ref="noteTitle" class="title text-color mt-n1">{{ `${$t('note.label.home')} ${spaceDisplayName}` }}</span>
             <div
               id="note-actions-menu"
               v-show="loadData && !hideElementsForSavingPDF"
@@ -125,7 +125,7 @@
       :default-path="defaultPath" 
       @open-treeview="$refs.notesBreadcrumb.open(note.id, 'movePage')"
       @export-pdf="createPDF(note)"
-      @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions)"
+      @open-history="$refs.noteVersionsHistoryDrawer.open(noteVersions,note.canManage)"
       @open-treeview-export="$refs.notesBreadcrumb.open(note.id, 'exportNotes')" />
     <note-treeview-drawer
       ref="notesBreadcrumb" />

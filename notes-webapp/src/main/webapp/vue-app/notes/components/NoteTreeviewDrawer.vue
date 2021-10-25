@@ -89,7 +89,7 @@
               </div>
             </v-col>
           </v-row>
-          <template v-if="home && !exportNotes && resultSearch && filter !== $t('notes.filter.label.drafts')" class="ma-0 border-box-sizing">
+          <template v-if="home && !exportNotes && resultSearch && !search && filter !== $t('notes.filter.label.drafts')" class="ma-0 border-box-sizing">
             <v-list-item @click="openNote(event,home)">
               <v-list-item-content>
                 <v-list-item-title class="body-2 treeview-home-link">
@@ -264,7 +264,13 @@ export default {
       this.showTree = true;
       if (this.search) {
         this.active = this.allItems.filter(item => item.name.toLowerCase().match(this.search.toLowerCase()));
+        this.items = this.active;
+        this.items.forEach(item  => {
+          item.children=null;
+        });
         this.showTree = this.active.length ? true :false;
+      } else {
+        this.retrieveNoteTree(this.note.wikiType, this.note.wikiOwner , this.note.name);
       }
     },
     checkbox() {
