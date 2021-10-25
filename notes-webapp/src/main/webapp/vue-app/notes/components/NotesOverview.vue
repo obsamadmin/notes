@@ -311,8 +311,8 @@ export default {
     this.$root.$on('export-notes', (notesSelected,importAll,homeNoteId) => {
       this.exportNotes(notesSelected,importAll,homeNoteId);
     });
-    this.$root.$on('import-notes', () => {
-      this.importNotes();
+    this.$root.$on('import-notes', (uploadId,overrideMode) => {
+      this.importNotes(uploadId,overrideMode);
     });
 
     
@@ -383,8 +383,8 @@ export default {
         });          
       });
     },
-    importNotes(){
-      this.$notesService.importZipNotes(this.note.id).then(() => {
+    importNotes(uploadId,overrideMode){
+      this.$notesService.importZipNotes(this.note.id,uploadId,overrideMode).then(() => {
         this.$root.$emit('close-note-tree-drawer');
         this.$root.$emit('show-alert', {type: 'success',message: this.$t('notes.alert.success.label.notes.imported')});
       }).catch(e => {

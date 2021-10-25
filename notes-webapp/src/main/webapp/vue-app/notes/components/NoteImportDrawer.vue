@@ -57,14 +57,23 @@
               <v-stepper-content step="2">
                 <template>
                   <v-container class="mt-n5">
-                    <v-checkbox
+                    <v-radio-group
                       v-model="selected"
-                      :label="$t('notes.label.importRules1')"
-                      value="replace" />
-                    <v-checkbox
-                      v-model="selected"
-                      :label="$t('notes.label.importRules2')"
-                      value="update" />
+                      column
+                      >
+                      <v-radio
+                        :label="$t('notes.label.importRules1')"
+                        value="overwrite"
+                      ></v-radio>
+                      <v-radio
+                        :label="$t('notes.label.importRules2')"
+                        value="update"
+                      ></v-radio>
+                      <v-radio
+                        :label="$t('notes.label.importRules3')"
+                        value="duplicate"
+                      ></v-radio>
+                    </v-radio-group>
                   </v-container>
                 </template>
                 <v-card-actions class="mt-4 px-0">
@@ -121,7 +130,7 @@ export default {
   data() {
     return {
       e6: 1,
-      selected: null,
+      selected: 'nothing',
       value: [],
     };
   },
@@ -142,7 +151,7 @@ export default {
       this.$refs.importNotesDrawer.close();
     },
     importNotes(){
-      this.$root.$emit('import-notes');
+      this.$root.$emit('import-notes',this.value[0].uploadId,this.selected);
       this.cancel();
     },
   }

@@ -254,8 +254,8 @@ export function moveNotes(note,destination) {
   });
 }
 
-export function importZipNotes(noteId) {
-  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/import/${noteId}`, {
+export function importZipNotes(noteId,uploadId,overrideMode) {
+  return fetch(`${notesConstants.PORTAL}/${notesConstants.PORTAL_REST}/notes/note/import/${noteId}/${uploadId}?conflict=${overrideMode}`, {
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json'
