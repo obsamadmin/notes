@@ -30,9 +30,9 @@
     <!-- **************************************** -->
     <!-- Project Dependencies                     -->
     <!-- **************************************** -->
-    <org.exoplatform.social.version>6.3.x-SNAPSHOT</org.exoplatform.social.version>
-    <org.exoplatform.platform-ui.version>6.3.x-SNAPSHOT</org.exoplatform.platform-ui.version>
-    <addon.exo.gamification.version>2.3.x-SNAPSHOT</addon.exo.gamification.version>
+    <org.exoplatform.social.version>6.3.0-20211103</org.exoplatform.social.version>
+    <org.exoplatform.platform-ui.version>6.3.0-20211103</org.exoplatform.platform-ui.version>
+    <addon.exo.gamification.version>2.3.0-20211103</addon.exo.gamification.version>
     
     <!-- Sonar properties -->
     <sonar.organization>meeds-io</sonar.organization>
