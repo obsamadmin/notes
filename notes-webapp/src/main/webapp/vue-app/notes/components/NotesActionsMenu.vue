@@ -72,6 +72,17 @@
         </v-icon>
         <span>{{ $t('notes.menu.label.export') }}</span>
       </v-list-item>
+      <v-list-item
+        v-if="homePage && note.canManage =='true'"
+        class="px-2 text-left action-menu-item draftButton"
+        @click="$emit('open-import-drawer')">
+        <v-icon
+          size="18"
+          class="primary--text clickable pr-2">
+          mdi-import
+        </v-icon>
+        <span>{{ $t('notes.menu.label.import') }}</span>
+      </v-list-item>
     </v-list>
   </v-menu>
 </template>
@@ -89,7 +100,7 @@ export default {
     },
     defaultPath: {
       type: String,
-      default: () => 'WikiHome',
+      default: () => 'Home',
     }
   },
   computed: {
