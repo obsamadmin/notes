@@ -111,6 +111,7 @@ export default {
       } else if ( id === 'note') {
         this.$root.$emit('display-treeview-items');
       } else if ( id === 'ToC') {
+        //this.$root.$emit('display-manual-child');
         this.instance.execCommand(id, this.noteChildren);
         this.close();
       }

@@ -593,7 +593,8 @@ export default {
     formatContent (content) {
       const internal = location.host + eXo.env.portal.context;
       const domParser = new DOMParser();
-      const docElement = domParser.parseFromString(content, 'text/html').documentElement;
+      const domHtmlParser = domParser.parseFromString(content, 'text/html');
+      const docElement = domHtmlParser.documentElement;
       const links = docElement.getElementsByTagName('a');
       const tables = docElement.getElementsByTagName('table');
       for (const link of links) {
@@ -611,8 +612,9 @@ export default {
           table.setAttribute('role', 'presentation');
         }
         if (!table.hasAttribute('summary')) {
-          const customId = table.parentElement.id.split('-').pop();
-          const tableSummary = document.getElementById(`summary-${customId}`);
+          const customId = table.previousSibling.id.split('-').pop();class="font-weight-bold"
+          const tableSummary = table.previousSibling;
+          console.warn('tableSummary',tableSummary);
           if ( tableSummary !== null ) {
             table.setAttribute('summary', tableSummary.innerText);
           }

@@ -145,7 +145,8 @@ export default {
       draftSavingStatus: '',
       autoSaveDelay: 1000,
       saveDraft: '',
-      postKey: 1
+      postKey: 1,
+      navigationLabel: `${this.$t('notes.label.navigation')}`,
     };
   },
   computed: {
@@ -259,6 +260,10 @@ export default {
       } else {
         editor.insertHtml(`<a href='${note.noteId}' class='noteLink'>${note.name}</a>`);
       }
+    });
+    this.$root.$on('display-manual-child', () => {
+      const editor = $('textarea#notesContent').ckeditor().editor;
+      editor.insertHtml(`<div id='note-children-container' class='navigation-img-wrapper VuetifyApp'><img src='/notes/images/children.png' class='note-navigation-img' /><span class='note-navigation-label'>${this.navigationLabel}</span></div><p></p>`);
     });
   },
   mounted() {
@@ -500,6 +505,10 @@ export default {
       }
       CKEDITOR.addCss('.cke_editable { font-size: 14px;}');
       CKEDITOR.addCss('.placeholder { color: #a8b3c5!important;}');
+      CKEDITOR.addCss('.note-navigation-img { width: 40px!important; margin-top: 10px;}');
+      CKEDITOR.addCss('.note-navigation-label { color: #578dc9; }');
+      CKEDITOR.addCss('.navigation-img-wrapper { display: inline-flex!important; align-items:center; padding: 0 12px;border: 2px solid #578dc9;border-radius: 2px;}');
+      CKEDITOR.addCss('.navigation-img-wrapper .cke_widget_selectImage { margin-bottom: 0!important;}');
 
       // this line is mandatory when a custom skin is defined
 
