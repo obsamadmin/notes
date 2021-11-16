@@ -1,18 +1,18 @@
 /*
- * Copyright (C) 2003-2010 eXo Platform SAS.
+ * Copyright (C) 2021 eXo Platform SAS
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Affero General Public License
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
+ *  This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see<http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <gnu.org/licenses>.
  */
 package org.exoplatform.wiki.service;
 
@@ -305,9 +305,18 @@ public class TestNoteService extends BaseTest {
   public void testExportNotes() throws WikiException, IllegalAccessException {
     Identity root = new Identity("root");
     Wiki portalWiki = getOrCreateWiki(wService, PortalConfig.PORTAL_TYPE, "exportPortal");
-    Page note1 = noteService.createNote(portalWiki, "Home", new Page("exported1", "exported1"),root) ;
-    Page note2 = noteService.createNote(portalWiki, "Home", new Page("exported2", "exported2"),root) ;
-    Page note3 = noteService.createNote(portalWiki, "Home", new Page("exported3", "exported3"),root) ;
+    Page page1 = new Page("exported1", "exported1");
+    page1.setContent("<figure class=\"image\"><img src=\"/portal/rest/wiki/attachments/group/space//spaces/base_de_connaissances/page/4.01-_Profil_et_paramètres/Navigation paramètres.png\"></figure>");
+    Page note1 = noteService.createNote(portalWiki, "Home",page1,root) ;
+
+    Page page2 = new Page("exported2", "exported2");
+    page2.setContent("<a class=\"noteLink\" href=\"exported1\" target=\"_blank\">Règles de rédaction des tutoriels </a>");
+    Page note2 = noteService.createNote(portalWiki, "Home",page2,root) ;
+
+
+    Page page3 = new Page("exported3", "exported3");
+    page3.setContent("<a class=\"noteLink\" href=\""+note2.getId()+"\">Home</a>");
+    Page note3 = noteService.createNote(portalWiki, "Home",page3,root) ;
 
     assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported1")) ;
     assertNotNull(noteService.getNoteOfNoteBookByName(PortalConfig.PORTAL_TYPE, "exportPortal", "exported2")) ;
