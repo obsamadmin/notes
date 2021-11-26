@@ -62,6 +62,9 @@ export default {
     treeviewInserted: false
   }),
   computed: {
+    showTOC() {
+      return this.treeviewInserted;
+    },
     plugins() {
       const pluginsList = [
         { id: 'video',title: 'Video', src: '/notes/images/video.png', tooltip: this.$t('notes.label.insertVideo') },
