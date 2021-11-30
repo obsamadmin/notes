@@ -238,7 +238,10 @@
       @dialog-closed="$emit('confirmDialogClosed')" />
     <v-alert
       v-model="alert"
+      :class="alertMessageClass"
       :type="type"
+      :icon="type === 'warning' ? 'mdi-alert-circle' : ''"
+      @input="onclose"
       dismissible>
       {{ message }}
     </v-alert>
@@ -270,6 +273,7 @@ export default {
       },
       confirmMessage: '',
       spaceDisplayName: eXo.env.portal.spaceDisplayName,
+      spaceId: eXo.env.portal.spaceId,
       noteBookType: eXo.env.portal.spaceName ? 'group' : 'user',
       noteBookOwner: eXo.env.portal.spaceGroup ? `/spaces/${eXo.env.portal.spaceGroup}` : eXo.env.portal.profileOwner,
       noteNotFountImage: '/notes/skin/images/notes_not_found.png',
@@ -392,6 +396,12 @@ export default {
       const uris = eXo.env.portal.selectedNodeUri.split('/');
       return uris[uris.length - 1];
     },
+    alertWarningDisplayed(){
+      return (localStorage.getItem(`displayAlertSpaceId-${this.spaceId}`) === 'already_display');
+    },
+    alertMessageClass(){
+      return  this.message.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length > 45 ? 'lengthyAlertMessage' : '';
+    }
   },
   created() {
     if (this.currentPath.endsWith('draft')) {
@@ -512,6 +522,13 @@ export default {
         console.error('Error when getting note', e);
         this.existingNote = false;
       }).finally(() => {
+        if (!this.note.canManage && !this.alertWarningDisplayed){
+          const messageObject = {
+            type: 'warning',
+            message: `${this.$t('notes.alert.warning.label.notification')}`
+          };
+          this.displayMessage(messageObject, true);
+        }
         this.$root.$applicationLoaded();
         this.$root.$emit('refresh-treeView-items', this.note);
       });
@@ -540,6 +557,13 @@ export default {
         console.error('Error when getting note', e);
         this.existingNote = false;
       }).finally(() => {
+        if (!this.note.canManage && !this.alertWarningDisplayed){
+          const messageObject = {
+            type: 'warning',
+            message: `${this.$t('notes.alert.warning.label.notification')}`
+          };
+          this.displayMessage(messageObject, true);
+        }
         this.$root.$applicationLoaded();
         this.$root.$emit('refresh-treeView-items', this.note);
       });
@@ -628,11 +652,16 @@ export default {
         });
       });
     },
-    displayMessage(message) {
+    displayMessage(message, keepAlert) {
       this.message=message.message;
       this.type=message.type;
       this.alert = true;
-      window.setTimeout(() => this.alert = false, 5000);
+      if (!keepAlert) {
+        window.setTimeout(() => this.alert = false, 5000);
+      }
+    },
+    onclose() {
+      localStorage.setItem(`displayAlertSpaceId-${this.spaceId}`, 'already_display');
     },
     getNoteVersionByNoteId(noteId) {
       return this.$notesService.getNoteVersionsByNoteId(noteId).then(data => {
