@@ -47,11 +47,16 @@ import org.exoplatform.wiki.service.WikiService;
 import org.exoplatform.wiki.service.impl.WikiPageHistory;
 import org.exoplatform.wiki.service.search.SearchResult;
 import org.exoplatform.wiki.service.search.WikiSearchData;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.safety.Whitelist;
 import org.suigeneris.jrcs.diff.DifferentiationFailedException;
 
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.servlet.http.HttpServletRequest;
+import javax.swing.text.EditorKit;
+import javax.swing.text.html.HTMLEditorKit;
 import java.io.*;
 import java.util.*;
 import java.util.zip.ZipEntry;
@@ -715,6 +720,11 @@ public class Utils {
         bos.write(bytesIn, 0, read);
       }
     }
+  }
+
+  public static String html2text(String html) {
+    Document doc = Jsoup.parse(html);
+    return doc.text();
   }
 
 }
