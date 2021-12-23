@@ -1070,6 +1070,28 @@ public class NoteServiceImpl implements NoteService {
     return list;
   }
 
+  private LinkedList<String> getNoteAncestorsIds(String noteId) throws WikiException {
+    return getNoteAncestorsIds(null, noteId);
+  }
+
+  private LinkedList<String> getNoteAncestorsIds(LinkedList<String> ancestorsIds, String noteId) throws WikiException {
+    if (ancestorsIds == null) {
+      ancestorsIds = new LinkedList<>();
+    }
+    if (noteId == null) {
+      return ancestorsIds;
+    }
+    Page note = getNoteById(noteId);
+    String parentId = note.getParentPageId();
+    
+    if (parentId != null) {
+      ancestorsIds.push(parentId);
+      getNoteAncestorsIds(ancestorsIds, parentId);
+    }
+    
+    return ancestorsIds;
+  }
+
   private String getDraftNameSuffix(long clientTime) {
     return new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date(clientTime));
   }
@@ -1181,9 +1203,7 @@ public class NoteServiceImpl implements NoteService {
                   note.getWikiOwner());
           noteToExport.setContent(processImagesForExport(note));
           noteToExport.setContent(processNotesLinkForExport(noteToExport));
-          // TODO implement method for getting ancestors
-          LinkedList<String> ancestors = new LinkedList<>(getBreadCrumb(noteToExport.getWikiType(), noteToExport.getWikiOwner(), noteToExport.getName(), false).stream().map(BreadcrumbData::getNoteId).collect(Collectors.toList()));
-          ancestors.remove(noteToExport.getId());
+          LinkedList<String> ancestors = getNoteAncestorsIds(noteToExport.getId());
           noteToExport.setAncestors(ancestors);
           if (ancestors.size() > maxAncestors) {
             maxAncestors = ancestors.size();
