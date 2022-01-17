@@ -23,7 +23,7 @@
               <span class="notesFormTitle ps-2">{{ noteFormTitle }}</span>
             </div>
             <div class="notesFormRightActions pr-7">
-              <p class="draftSavingStatus mr-7">{{ draftSavingStatus }}</p>
+              <p v-if="!initChildNavigation" class="draftSavingStatus mr-7">{{ draftSavingStatus }}</p>
               <button
                 id="notesUpdateAndPost"
                 class="btn btn-primary primary px-2 py-0"
@@ -149,7 +149,7 @@ export default {
       saveDraft: '',
       postKey: 1,
       navigationLabel: `${this.$t('notes.label.Navigation')}`,
-      noteNavigationDisplayed: false
+      initMacroChildCompleted: false
     };
   },
   computed: {
@@ -173,18 +173,27 @@ export default {
     alertMessageClass(){
       return  this.message.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length > 45 ? 'lengthyAlertMessage' : '';
     },
+    initChildNavigation() {
+      return this.initMacroChildCompleted;
+    }
   },
   watch: {
     'note.title'() {
       if (this.note.title !== this.actualNote.title ) {
+        if (this.initMacroChildCompleted) {
+          this.initMacroChildCompleted = false;
+        }
         this.autoSave();
       }
     },
     'note.content'() {
       if (this.note.content !== this.actualNote.content) {
+        if (this.initMacroChildCompleted) {
+          this.initMacroChildCompleted = false;
+        }
         this.autoSave();
       }
-    },
+    }
   },
   created() {
     window.addEventListener('beforeunload', () => {
@@ -297,6 +306,10 @@ export default {
         return;
       }
 
+      if (this.initMacroChildCompleted) {
+        return;
+      }
+
       // close draft dropping related alert
       if (this.alertType === 'warning' && this.note.draftPage && this.alert) {
         this.alert = false;
@@ -309,7 +322,7 @@ export default {
         this.$nextTick(() => {
           this.saveNoteDraft();
         });
-      }, this.autoSaveDelay);
+      }, 0);
     },
     getNote(id) {
       return this.$notesService.getLatestDraftOfPage(id).then(latestDraft => {
@@ -364,6 +377,7 @@ export default {
         if ((this.note.content.trim().length === 0)) {
           this.$notesService.getNoteById(this.noteId, '','','',true).then(data => {
             if (data && data.children && data.children.length) {
+              this.initMacroChildCompleted = true;
               CKEDITOR.instances['notesContent'].setData(childContainer);
               this.setFocus();
             }
@@ -496,9 +510,7 @@ export default {
           localStorage.setItem(`draftNoteId-${this.note.id}`, JSON.stringify(savedDraftNote));
         }).then(() => {
           this.savingDraft = false;
-          setTimeout(() => {
-            this.draftSavingStatus = this.$t('notes.draft.savedDraftStatus');
-          }, this.autoSaveDelay/2);
+          this.draftSavingStatus = this.$t('notes.draft.savedDraftStatus');
         }).catch(e => {
           console.error('Error when creating draft note: ', e);
           this.$root.$emit('show-alert', {
