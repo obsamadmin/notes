@@ -228,6 +228,7 @@ export default {
     showTree: true,
     search: '',
     noteNotFountImage: '/notes/skin/images/notes_not_found.png',
+    insertNote: null
   }),
   computed: {
     openedItems() {
@@ -320,7 +321,8 @@ export default {
     this.filter = this.filterOptions[0];
   },
   methods: {
-    open(note, source, includeDisplay) {
+    open(note, source, includeDisplay, currentNoteId) {
+      if (!currentNoteId) {this.insertNote = true;}
       this.render = false;
       if (note.draftPage) {
         this.filter = this.filterOptions[1];
@@ -360,7 +362,8 @@ export default {
       this.closeAll = false;
     },
     openNote(event, note) {
-      const canOpenNote = (this.filter !== this.$t('notes.filter.label.drafts') || this.filter === this.$t('notes.filter.label.drafts') && note.draftPage) && note.noteId !== this.note.id;
+      const canOpenNote = (this.filter !== this.$t('notes.filter.label.drafts') || this.filter === this.$t('notes.filter.label.drafts') && note.draftPage)
+       && (this.insertNote ? true : note.noteId !== this.note.id);
       if (canOpenNote) {
         //reinitialize filter
         this.filter = this.filterOptions[0];
