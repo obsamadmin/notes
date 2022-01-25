@@ -202,6 +202,7 @@
 export default {
   data: () => ({
     note: {},
+    parentNote: {},
     items: [],
     allItems: [],
     allItemsHome: [],
@@ -228,7 +229,6 @@ export default {
     showTree: true,
     search: '',
     noteNotFountImage: '/notes/skin/images/notes_not_found.png',
-    insertNote: null
   }),
   computed: {
     openedItems() {
@@ -321,9 +321,10 @@ export default {
     this.filter = this.filterOptions[0];
   },
   methods: {
-    open(note, source, includeDisplay, currentNoteId) {
-      if (!currentNoteId) {this.insertNote = true;}
+    open(note, parentNote, source, includeDisplay) {
       this.render = false;
+      this.parentNote = note;
+      note = note ? note : parentNote;
       if (note.draftPage) {
         this.filter = this.filterOptions[1];
         this.getDraftNote(note.id);
@@ -363,7 +364,7 @@ export default {
     },
     openNote(event, note) {
       const canOpenNote = (this.filter !== this.$t('notes.filter.label.drafts') || this.filter === this.$t('notes.filter.label.drafts') && note.draftPage)
-       && (this.insertNote ? true : note.noteId !== this.note.id);
+       && (!this.parentNote ? true : note.noteId !== this.note.id);
       if (canOpenNote) {
         //reinitialize filter
         this.filter = this.filterOptions[0];

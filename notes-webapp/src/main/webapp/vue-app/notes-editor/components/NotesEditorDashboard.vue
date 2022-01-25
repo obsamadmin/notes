@@ -238,11 +238,14 @@ export default {
     });
     this.$root.$on('display-treeview-items', () => {
       if ( urlParams.has('noteId') ) {
-        this.$refs.noteTreeview.open(this.note, 'includePages', null, this.note.id);
+        this.$notesService.getNoteById(this.parentPageId).then(data => {
+          const parentNote = data;
+          this.$refs.noteTreeview.open(this.note, parentNote, 'includePages');
+        });
       } else if (urlParams.has('parentNoteId')) {
         this.$notesService.getNoteById(this.parentPageId).then(data => {
-          const note = data;
-          this.$refs.noteTreeview.open(note, 'includePages', null, this.note.id);
+          const parentNote = data;
+          this.$refs.noteTreeview.open(null, parentNote, 'includePages');
         });
       }
     });
