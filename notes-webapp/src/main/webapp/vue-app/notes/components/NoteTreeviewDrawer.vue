@@ -324,12 +324,10 @@ export default {
     open(note, parentNote, source, includeDisplay) {
       this.render = false;
       this.parentNote = parentNote;
+      this.note = note;
       if (this.parentNote.wikiType === 'group'){
         this.parentNote.wikiOwner = this.parentNote.wikiOwner.substring(1);
       }
-      this.note=note;
-
-      //note = note ? note : parentNote;
       if (note){
         if (note.draftPage) {
           this.filter = this.filterOptions[1];
