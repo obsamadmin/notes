@@ -640,9 +640,10 @@ export default {
             const element = evt.data.element;
             if ( element && element.is('a')) {
               const noteId = element.getAttribute( 'href' );
-              self.$notesService.getNoteById(noteId).then(data => {
-                const note = data;
-                self.$refs.noteTreeview.open(note, 'includePages', 'no-arrow');
+              self.$notesService.getNoteById(noteId).then(dataNote => {
+                self.$notesService.getNoteById(self.parentPageId).then(dataParentPAge => {
+                  self.$refs.noteTreeview.open(dataNote,dataParentPAge, 'includePages', 'no-arrow');
+                });
               });
             }
           }

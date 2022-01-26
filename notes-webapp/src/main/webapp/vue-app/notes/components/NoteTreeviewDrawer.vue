@@ -323,15 +323,27 @@ export default {
   methods: {
     open(note, parentNote, source, includeDisplay) {
       this.render = false;
-      this.parentNote = note;
-      note = note ? note : parentNote;
-      if (note.draftPage) {
-        this.filter = this.filterOptions[1];
-        this.getDraftNote(note.id);
-      } else {
-        this.filter = this.filterOptions[0];
-        this.getNoteById(note.id);
+      this.parentNote = parentNote;
+      this.note=note;
+      //note = note ? note : parentNote;
+      if (note){
+        if (note.draftPage) {
+          this.filter = this.filterOptions[1];
+          this.getDraftNote(note.id);
+        } else {
+          this.filter = this.filterOptions[0];
+          this.getNoteById(note.id);
+        }
       }
+      else {
+        if (parentNote.draftPage) {
+          this.filter = this.filterOptions[1];
+          this.getDraftNote(parentNote.id);
+        } else {
+          this.filter = this.filterOptions[0];
+          this.getNoteById(parentNote.id);
+        }
+      } 
       if (source === 'includePages') {
         this.isIncludePage = true;
       } else {
@@ -364,7 +376,7 @@ export default {
     },
     openNote(event, note) {
       const canOpenNote = (this.filter !== this.$t('notes.filter.label.drafts') || this.filter === this.$t('notes.filter.label.drafts') && note.draftPage)
-       && (!this.parentNote ? true : note.noteId !== this.note.id);
+       && (!this.note ? true : note.noteId !== this.note.id);
       if (canOpenNote) {
         //reinitialize filter
         this.filter = this.filterOptions[0];
