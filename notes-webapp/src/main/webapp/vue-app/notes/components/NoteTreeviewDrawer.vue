@@ -324,7 +324,11 @@ export default {
     open(note, parentNote, source, includeDisplay) {
       this.render = false;
       this.parentNote = parentNote;
+      if (this.parentNote.wikiType === 'group'){
+        this.parentNote.wikiOwner = this.parentNote.wikiOwner.substring(1);
+      }
       this.note=note;
+
       //note = note ? note : parentNote;
       if (note){
         if (note.draftPage) {
@@ -334,16 +338,9 @@ export default {
           this.filter = this.filterOptions[0];
           this.getNoteById(note.id);
         }
+      } else {
+        this.retrieveNoteTree(this.parentNote.wikiType, this.parentNote.wikiOwner , this.parentNote.name);
       }
-      else {
-        if (parentNote.draftPage) {
-          this.filter = this.filterOptions[1];
-          this.getDraftNote(parentNote.id);
-        } else {
-          this.filter = this.filterOptions[0];
-          this.getNoteById(parentNote.id);
-        }
-      } 
       if (source === 'includePages') {
         this.isIncludePage = true;
       } else {
@@ -444,7 +441,7 @@ export default {
           this.allItems = data.jsonList;
           this.allItemsHome = data.treeNodeData;
         }
-        const openedTreeViewItems = this.getOpenedTreeViewItems(this.note.breadcrumb);
+        const openedTreeViewItems = this.getOpenedTreeViewItems(this.parentNote.breadcrumb);
         this.openNotes = [];
         this.openNotes = openedTreeViewItems;
         this.activeItem = [];
