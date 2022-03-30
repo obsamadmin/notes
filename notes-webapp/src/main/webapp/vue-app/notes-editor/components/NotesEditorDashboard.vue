@@ -209,7 +209,7 @@ export default {
           name: this.notes.name,
           wikiType: this.notes.wikiType,
           wikiOwner: this.notes.wikiOwner,
-          content: this.notes.content,
+          content: this.getBody() || this.notes.content,
           parentPageId: this.notes.parentPageId,
           toBePublished: toPost,
           appName: this.appName,
@@ -380,6 +380,10 @@ export default {
       this.alert = true;
       window.setTimeout(() => this.alert = false, 5000);
     },
+    getBody: function() {
+      const newData = CKEDITOR.instances['notesContent'].getData();
+      return newData ? newData : null;
+    }
   }
 };
 </script>
