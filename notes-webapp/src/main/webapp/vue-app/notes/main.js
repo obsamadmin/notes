@@ -35,6 +35,9 @@ if (!Vue.prototype.$notesService) {
   });
 }
 
+//used only in mobile statistics
+eXo.env.portal.mainApplicationName = 'Notes';
+
 export function init() {
   exoi18n.loadLanguageAsync(lang, url).then(i18n => {
     const appElement = document.createElement('div');
