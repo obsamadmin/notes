@@ -8,6 +8,8 @@
     <exo-drawer
       ref="breadcrumbDrawer"
       class="breadcrumbDrawer"
+      :confirm-close="this.exporting"
+      :confirm-close-labels="confirmCloseLabels"
       v-model="drawer"
       show-overlay
       @closed="closeAllDrawer()"
@@ -410,6 +412,14 @@ export default {
     dataCreated: false,
   }),
   computed: {
+    confirmCloseLabels() {
+      return {
+        title: this.$t('notes.confirmCancelExport.title'),
+        message: this.$t('notes.confirmCancelExport'),
+        ok: this.$t('notes.button.yes'),
+        cancel: this.$t('notes.button.no'),
+      };
+    },
     openedItems() {
       return this.openNotes;
     },
@@ -668,6 +678,11 @@ export default {
     closeAllDrawer() {
       $('.spaceButtomNavigation').removeClass('hidden');
       this.search = '';
+      if (this.exporting){
+        this.$root.$emit('cancel-export-notes');
+        this.exportStatus = {};
+        this.exporting = false; 
+      }
       if (this.closeAll) {
         this.$emit('closed');
       }
