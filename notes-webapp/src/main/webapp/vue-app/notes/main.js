@@ -36,7 +36,7 @@ if (!Vue.prototype.$notesService) {
 }
 
 //used only in mobile statistics
-eXo.env.portal.mainApplicationName = 'Notes';
+eXo.env.portal.mainApplicationName = 'Note';
 
 export function init() {
   exoi18n.loadLanguageAsync(lang, url).then(i18n => {
